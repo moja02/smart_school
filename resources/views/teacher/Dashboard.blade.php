@@ -1,172 +1,146 @@
 @extends('layouts.teacher')
 
 @section('content')
-
-@php
-    // جلب بيانات المدرسة وحالة الرصد
-    $school = \App\Models\School::find(auth()->user()->school_id);
-    $teacherId = auth()->id();
+<div class="container-fluid py-4">
     
-    // ✅ تصحيح الاستعلامات بناءً على اسم الجدول الصحيح: teacher_subject_section
-    
-    // 1. عدد المواد المختلفة التي يدرسها المعلم (نستخدم distinct لعدم تكرار المادة إذا كان يدرسها لأكثر من فصل)
-    $subjectsCount = \DB::table('teacher_subject_section')
-                        ->where('teacher_id', $teacherId)
-                        ->distinct('subject_id')
-                        ->count('subject_id');
-    
-    // 2. عدد الفصول (الشعب) التي يدرسها المعلم
-    $classesCount = \DB::table('teacher_subject_section')
-                        ->where('teacher_id', $teacherId)
-                        ->distinct('section_id')
-                        ->count('section_id');
-@endphp
-
-<div class="container py-4">
-
-    {{-- 1. الترويسة الرئيسية (نفس تصميم الأدمن الفخم: داكن وخط أبيض) --}}
-    <div class="card page-header-card mb-4 shadow border-0 bg-dark text-white">
-        <div class="card-body d-flex justify-content-between align-items-center">
-            <div>
-                <h2 class="fw-bold mb-1 text-white">لوحة المعلم 👨‍🏫</h2>
-                <p class="mb-0 opacity-75">
-                    أهلاً بك، الأستاذ <strong>{{ Auth::user()->name }}</strong> 👋.
-                </p>
-
-                {{-- حالة نظام الرصد --}}
-                <div class="mt-3">
-                    @if($school->grading_locked)
-                        <span class="badge bg-danger p-2 shadow-sm">
-                            <i class="fas fa-lock me-1"></i> الرصد مغلق من الإدارة
-                        </span>
-                    @else
-                        <span class="badge bg-success p-2 shadow-sm text-dark">
-                            <i class="fas fa-unlock me-1"></i> الرصد متاح حالياً
-                        </span>
-                    @endif
-                    <span class="text-white-50 ms-2 small"><i class="fas fa-calendar me-1"></i> {{ date('Y-m-d') }}</span>
+    {{-- رسالة الترحيب --}}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-primary text-white shadow-sm border-0">
+                <div class="card-body p-4 d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="fw-bold mb-1">مرحباً، {{ Auth::user()->name }} 👋</h2>
+                        <p class="mb-0 opacity-75">نتمنى لك يوماً دراسياً موفقاً!</p>
+                    </div>
+                    <div class="d-none d-md-block opacity-50">
+                        <i class="fas fa-chalkboard-teacher fa-4x"></i>
+                    </div>
                 </div>
-            </div>
-            
-            {{-- الأيقونة الخلفية --}}
-            <div class="d-none d-md-block">
-                <i class="fas fa-chalkboard-teacher fa-4x opacity-25 text-white"></i>
             </div>
         </div>
     </div>
 
-    {{-- 2. بطاقات الإحصائيات --}}
+    {{-- بطاقات الإحصائيات --}}
     <div class="row g-4 mb-4">
-        
-        {{-- كرت عدد الفصول --}}
-        <div class="col-md-6 col-lg-4">
-            <div class="card border-0 shadow-sm h-100 py-2 border-start border-4 border-primary">
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 border-start border-4 border-primary h-100">
                 <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs fw-bold text-primary text-uppercase mb-1">فصولي الدراسية</div>
-                            <div class="h3 mb-0 fw-bold text-dark">{{ $classesCount }}</div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted fw-bold">فصولي الدراسية</h6>
+                            <h2 class="fw-bold text-dark mb-0">{{ $classes->count() }}</h2>
                         </div>
-                        <div class="col-auto">
-                            <i class="fas fa-layer-group fa-2x text-gray-300 opacity-25"></i>
+                        <div class="bg-light text-primary rounded-circle p-3">
+                            <i class="fas fa-chalkboard fa-2x"></i>
                         </div>
                     </div>
+                    <a href="{{ route('teacher.classes') }}" class="btn btn-link text-decoration-none p-0 mt-3 small">عرض التفاصيل <i class="fas fa-arrow-left"></i></a>
                 </div>
             </div>
         </div>
 
-        {{-- كرت عدد المواد --}}
-        <div class="col-md-6 col-lg-4">
-            <div class="card border-0 shadow-sm h-100 py-2 border-start border-4 border-warning">
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 border-start border-4 border-success h-100">
                 <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs fw-bold text-warning text-uppercase mb-1">المواد المسندة</div>
-                            <div class="h3 mb-0 fw-bold text-dark">{{ $subjectsCount }}</div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted fw-bold">إجمالي الطلاب</h6>
+                            <h2 class="fw-bold text-dark mb-0">{{ $studentsCount }}</h2>
                         </div>
-                        <div class="col-auto">
-                            <i class="fas fa-book fa-2x text-gray-300 opacity-25"></i>
+                        <div class="bg-light text-success rounded-circle p-3">
+                            <i class="fas fa-users fa-2x"></i>
                         </div>
                     </div>
+                    <span class="text-muted small mt-3 d-block">موزعين على الفصول</span>
                 </div>
             </div>
         </div>
 
-        {{-- كرت الرسائل (يمكن تفعيله لاحقاً) --}}
-        <div class="col-md-6 col-lg-4">
-            <div class="card border-0 shadow-sm h-100 py-2 border-start border-4 border-info">
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 border-start border-4 border-warning h-100">
                 <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs fw-bold text-info text-uppercase mb-1">الرسائل الجديدة</div>
-                            {{-- مثال لعدد الرسائل غير المقروءة --}}
-                            @php
-                                $unreadMessages = \App\Models\Message::where('receiver_id', auth()->id())->where('is_read', 0)->count();
-                            @endphp
-                            <div class="h3 mb-0 fw-bold text-dark">{{ $unreadMessages }}</div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted fw-bold">المواد المسندة</h6>
+                            <h2 class="fw-bold text-dark mb-0">{{ $subjectsCount }}</h2>
                         </div>
-                        <div class="col-auto">
-                            <i class="fas fa-envelope fa-2x text-gray-300 opacity-25"></i>
+                        <div class="bg-light text-warning rounded-circle p-3">
+                            <i class="fas fa-book fa-2x"></i>
                         </div>
                     </div>
+                    <span class="text-muted small mt-3 d-block">مواد نشطة</span>
                 </div>
             </div>
         </div>
     </div>
 
-    {{-- 3. القسم السفلي: الوصول السريع والجدول --}}
     <div class="row">
-        {{-- الوصول السريع --}}
-        <div class="col-lg-8">
-            <div class="card shadow border-0 mb-4 h-100">
-                <div class="card-header bg-white py-3 border-bottom-0">
-                    <h6 class="m-0 fw-bold text-primary"><i class="fas fa-rocket me-2"></i> الوصول السريع</h6>
+        {{-- الوصول السريع للفصول --}}
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow border-0 h-100">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-door-open text-primary me-2"></i> وصول سريع للفصول</h5>
                 </div>
                 <div class="card-body">
-                    <div class="row g-3">
-                        {{-- زر الفصول (الأهم للمعلم) --}}
-                        <div class="col-md-6">
-                            <a href="{{ route('teacher.classes') }}" class="btn btn-outline-primary w-100 h-100 py-4 shadow-sm d-flex flex-column align-items-center justify-content-center gap-2 hover-scale text-decoration-none">
-                                <i class="fas fa-chalkboard fa-2x"></i>
-                                <span class="fw-bold fs-5">فصولي الدراسية</span>
-                                <small class="text-muted">رصد الدرجات، الغياب، والتقييمات</small>
-                            </a>
+                    @if($classes->count() > 0)
+                        <div class="row g-3">
+                            @foreach($classes->take(4) as $class)
+                            <div class="col-md-6">
+                                <div class="p-3 border rounded bg-light hover-shadow transition-all d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="fw-bold mb-1">{{ $class->name }}</h6>
+                                        <small class="text-muted">{{ $class->students_count ?? $class->students->count() }} طالب</small>
+                                    </div>
+                                    <a href="{{ route('teacher.class', $class->id) }}" class="btn btn-sm btn-primary rounded-pill px-3">
+                                        دخول <i class="fas fa-arrow-left small"></i>
+                                    </a>
+                                </div>
+                            </div>
+                            @endforeach
                         </div>
-
-                        {{-- زر الملف الشخصي --}}
-                        <div class="col-md-6">
-                            <a class="btn btn-outline-primary w-100 h-100 py-4 shadow-sm d-flex flex-column align-items-center justify-content-center gap-2 hover-scale text-decoration-none" href="{{ route('profile.edit') }}">
-                                <i class="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i>
-                                <span class="fw-bold fs-5">الملف الشخصي</span>
-                                <small class="text-muted">تعديل البيانات وكلمة المرور</small>
-                            </a>
+                        <div class="mt-3 text-center">
+                            <a href="{{ route('teacher.classes') }}" class="btn btn-outline-secondary btn-sm rounded-pill">عرض كل الفصول</a>
                         </div>
-                    </div>
+                    @else
+                        <div class="text-center py-4 opacity-50">
+                            <i class="fas fa-chalkboard fa-3x mb-2"></i>
+                            <p>لا توجد فصول مسندة لك حالياً.</p>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>
 
-        {{-- الجدول الدراسي المصغر --}}
-        <div class="col-lg-4">
-            <div class="card shadow border-0 mb-4 h-100">
-                <div class="card-header bg-white py-3 border-bottom-0">
-                    <h6 class="m-0 fw-bold text-secondary">📅 جدول حصص اليوم</h6>
+        {{-- التنبيهات والرسائل --}}
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow border-0 h-100">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold text-danger"><i class="fas fa-bell me-2"></i> تنبيهات جديدة</h5>
+                    <span class="badge bg-danger rounded-pill">{{ $recentMessages->count() }}</span>
                 </div>
-                <div class="card-body text-center py-5 d-flex flex-column justify-content-center">
-                    <i class="fas fa-calendar-day fa-4x text-light mb-3"></i>
-                    <p class="text-muted small">لا توجد حصص مسجلة لهذا اليوم.</p>
-                    {{-- رابط للجدول الكامل إذا كان متوفراً --}}
-                    <a href="#" class="btn btn-sm btn-link text-decoration-none">عرض الجدول الكامل</a>
+                <div class="list-group list-group-flush">
+                    @forelse($recentMessages as $msg)
+                        <a href="{{ route('messages.chat', $msg->sender_id) }}" class="list-group-item list-group-item-action py-3">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1 fw-bold">{{ $msg->sender->name ?? 'مستخدم' }}</h6>
+                                <small class="text-muted">{{ $msg->created_at->diffForHumans() }}</small>
+                            </div>
+                            <p class="mb-1 text-truncate text-muted small">{{ $msg->content }}</p>
+                        </a>
+                    @empty
+                        <div class="text-center py-5 text-muted">
+                            <i class="fas fa-check-circle fa-2x mb-2 text-success opacity-50"></i>
+                            <p class="mb-0">لا توجد رسائل جديدة.</p>
+                        </div>
+                    @endforelse
                 </div>
             </div>
         </div>
     </div>
-
 </div>
 
 <style>
-    .hover-scale { transition: transform 0.2s; }
-    .hover-scale:hover { transform: translateY(-5px); }
+    .hover-shadow:hover { box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1) !important; transform: translateY(-2px); }
+    .transition-all { transition: all 0.3s ease; }
 </style>
-
 @endsection

@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
-use Spatie\Activitylog\Models\Activity;
+
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\SchoolClass;
@@ -19,9 +19,9 @@ class ManagerController extends Controller
             'students_count' => User::role('student')->where('school_id', $schoolId)->count(),
             'teachers_count' => User::role('teacher')->where('school_id', $schoolId)->count(),
             'classes_count'  => SchoolClass::where('school_id', $schoolId)->count(),
-            'logs_count'     => Activity::whereHas('causer', function($query) use ($schoolId) {
-                                $query->where('school_id', $schoolId);
-                                })->count(),
+            'today_attendance' => Attendance::whereDate('attendance_date', now())
+                                    ->where('status', 1)
+                                    ->count()
         ];
 
         return view('manager.dashboard', compact('stats'));
@@ -74,26 +74,4 @@ class ManagerController extends Controller
 
         return redirect()->back()->with('success', 'تم تعيين مسؤول الدراسة والامتحانات (Admin) بنجاح ✅');
     }
-
-    public function systemLogs(Request $request)
-{
-    $query = \Spatie\Activitylog\Models\Activity::with('causer')->latest();
-
-    // فلترة حسب القسم (اسم السجل الذي حددناه في المودلز)
-    if ($request->has('log_name') && $request->log_name != '') {
-        $query->where('log_name', $request->log_name);
-    }
-
-    // فلترة حسب نوع الحركة (إضافة، تعديل، حذف)
-    if ($request->has('event') && $request->event != '') {
-        $query->where('event', $request->event);
-    }
-
-    $logs = $query->paginate(50)->withQueryString();
-
-    // جلب قائمة الأقسام المتاحة حالياً في السجلات لعرضها في القائمة المنسدلة
-    $logNames = \Spatie\Activitylog\Models\Activity::distinct()->pluck('log_name');
-
-    return view('manager.system_logs', compact('logs', 'logNames'));
-}
 }

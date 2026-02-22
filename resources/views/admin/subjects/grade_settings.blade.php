@@ -59,7 +59,7 @@
                     <thead class="bg-light text-muted small text-uppercase">
     <tr>
         <th class="ps-4 py-3">المادة الدراسية</th>
-        <th class="text-center">الحصص الأسبوعية</th> 
+        <th class="text-center">الحصص الأسبوعية</th> {{-- العمود الجديد --}}
         <th class="text-center">أعمال السنة</th>
         <th class="text-center">الامتحان النهائي</th>
         <th class="text-center">المجموع</th>

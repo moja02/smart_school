@@ -4,13 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Spatie\Activitylog\Traits\LogsActivity;
-use Spatie\Activitylog\LogOptions;
 
 class Subject extends Model
 {
     // protected $fillable = ['school_id','name','teacher_id','academic_year'];
-    use HasFactory , LogsActivity;
+    use HasFactory;
     protected $guarded = [];
     protected $fillable = [
     'name', 
@@ -22,60 +20,41 @@ class Subject extends Model
     'total_score'  // ✅ المجموع
     ];
 
-    public function getActivitylogOptions(): LogOptions
-    {
-        return LogOptions::defaults()
-            ->logOnly(['name', 'weekly_classes', 'works_score', 'final_score', 'total_score'])
-            ->logOnlyDirty()
-            ->useLogName('إعدادات المواد والدرجات');
-    }
-
     // ✅ دالة ذكية لجلب توزيع الدرجات (تتبع نفس منطقك في عدد الحصص)
-    public function getGradeDistribution()
+    public function getGradeDistribution($schoolId = null)
     {
-        $schoolId = auth()->user()->school_id;
+        $schoolId = $schoolId ?? auth()->user()->school_id;
 
-        // نبحث في جدول إعدادات المدرسة
-        $setting = \DB::table('school_subject_settings')
-            ->where('school_id', $schoolId)
-            ->where('subject_id', $this->id)
-            ->first();
-
-        // لو لقينا إعدادات، نرجعوها
-        if ($setting) {
+        // 1. إذا كانت المادة مخصصة للمدرسة، نأخذ الدرجات منها مباشرة
+        if ($this->school_id == $schoolId) {
             return [
-                'works' => $setting->works_score ?? 40,
-                'final' => $setting->final_score ?? 60,
-                'total' => $setting->total_score ?? 100,
+                'works' => $this->works_score ?? 40,
+                'final' => $this->final_score ?? 60,
+                'total' => $this->total_score ?? 100,
             ];
         }
 
-        // لو مفيش، نرجعوا القيم الافتراضية
-        return [
-            'works' => 40,
-            'final' => 60,
-            'total' => 100,
-        ];
-    }
+        // 2. البحث عن إعدادات مخصصة لهذه المدرسة في جدول الإعدادات
+        $customSetting = \DB::table('school_subject_settings')
+                            ->where('school_id', $schoolId)
+                            ->where('subject_id', $this->id)
+                            ->first();
 
-    public function getClassesCount()
-    {
-        $schoolId = auth()->user()->school_id;
-
-        // نبحث في جدول إعدادات المدرسة
-        $setting = \DB::table('school_subject_settings')
-            ->where('school_id', $schoolId)
-            ->where('subject_id', $this->id)
-            ->first();
-
-        if ($setting && $setting->weekly_classes) {
-            return $setting->weekly_classes;
+        if ($customSetting && isset($customSetting->works_score)) {
+            return [
+                'works' => $customSetting->works_score,
+                'final' => $customSetting->final_score,
+                'total' => $customSetting->total_score,
+            ];
         }
 
-        // لو مفيش، نرجعوا عدد الحصص من جدول المواد الأساسي، أو 1 كقيمة احتياطية
-        return $this->weekly_classes ?? 1;
+        // 3. الافتراضي
+        return [
+            'works' => $this->works_score ?? 40,
+            'final' => $this->final_score ?? 60,
+            'total' => $this->total_score ?? 100,
+        ];
     }
-
     public function school()
     {
         return $this->belongsTo(School::class);
@@ -100,28 +79,28 @@ class Subject extends Model
         return $this->belongsTo(Grade::class, 'grade_id');
     }
 
-//     public function getClassesCount($schoolId = null)
-// {
-//     // إذا لم يتم تمرير مدرسة، نستخدم مدرسة المستخدم الحالي
-//     $schoolId = $schoolId ?? auth()->user()->school_id;
+    public function getClassesCount($schoolId = null)
+{
+    // إذا لم يتم تمرير مدرسة، نستخدم مدرسة المستخدم الحالي
+    $schoolId = $schoolId ?? auth()->user()->school_id;
 
-//     // 1. إذا كانت المادة خاصة بهذه المدرسة أصلاً، نرجع قيمتها المباشرة
-//     if ($this->school_id == $schoolId) {
-//         return $this->weekly_classes;
-//     }
+    // 1. إذا كانت المادة خاصة بهذه المدرسة أصلاً، نرجع قيمتها المباشرة
+    if ($this->school_id == $schoolId) {
+        return $this->weekly_classes;
+    }
 
-//     // 2. إذا كانت عامة، نبحث هل يوجد لها إعداد خاص في الجدول الجديد؟
-//     $customSetting = \DB::table('school_subject_settings')
-//                         ->where('school_id', $schoolId)
-//                         ->where('subject_id', $this->id)
-//                         ->first();
+    // 2. إذا كانت عامة، نبحث هل يوجد لها إعداد خاص في الجدول الجديد؟
+    $customSetting = \DB::table('school_subject_settings')
+                        ->where('school_id', $schoolId)
+                        ->where('subject_id', $this->id)
+                        ->first();
 
-//     if ($customSetting) {
-//         return $customSetting->weekly_classes; // ✅ إرجاع القيمة الخاصة
-//     }
+    if ($customSetting) {
+        return $customSetting->weekly_classes; // ✅ إرجاع القيمة الخاصة
+    }
 
-//     // 3. إذا لم يوجد تخصيص، نرجع القيمة العامة الافتراضية
-//     return $this->weekly_classes;
-// }
+    // 3. إذا لم يوجد تخصيص، نرجع القيمة العامة الافتراضية
+    return $this->weekly_classes;
+}
 
 }

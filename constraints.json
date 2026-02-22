@@ -1,0 +1,368 @@
+{
+    "schedule": [
+        {
+            "class": "26",
+            "subject": "1",
+            "teacher": "4",
+            "day": "Tue",
+            "slot": 6
+        },
+        {
+            "class": "26",
+            "subject": "1",
+            "teacher": "4",
+            "day": "Wed",
+            "slot": 3
+        },
+        {
+            "class": "26",
+            "subject": "1",
+            "teacher": "4",
+            "day": "Wed",
+            "slot": 5
+        },
+        {
+            "class": "26",
+            "subject": "1",
+            "teacher": "4",
+            "day": "Wed",
+            "slot": 6
+        },
+        {
+            "class": "26",
+            "subject": "2",
+            "teacher": "4",
+            "day": "Tue",
+            "slot": 1
+        },
+        {
+            "class": "26",
+            "subject": "2",
+            "teacher": "4",
+            "day": "Tue",
+            "slot": 3
+        },
+        {
+            "class": "26",
+            "subject": "2",
+            "teacher": "4",
+            "day": "Tue",
+            "slot": 7
+        },
+        {
+            "class": "26",
+            "subject": "3",
+            "teacher": "2",
+            "day": "Mon",
+            "slot": 6
+        },
+        {
+            "class": "26",
+            "subject": "3",
+            "teacher": "2",
+            "day": "Tue",
+            "slot": 2
+        },
+        {
+            "class": "26",
+            "subject": "3",
+            "teacher": "2",
+            "day": "Tue",
+            "slot": 4
+        },
+        {
+            "class": "26",
+            "subject": "3",
+            "teacher": "2",
+            "day": "Tue",
+            "slot": 5
+        },
+        {
+            "class": "26",
+            "subject": "3",
+            "teacher": "2",
+            "day": "Wed",
+            "slot": 1
+        },
+        {
+            "class": "26",
+            "subject": "3",
+            "teacher": "2",
+            "day": "Wed",
+            "slot": 2
+        },
+        {
+            "class": "26",
+            "subject": "4",
+            "teacher": "8",
+            "day": "Mon",
+            "slot": 1
+        },
+        {
+            "class": "26",
+            "subject": "4",
+            "teacher": "8",
+            "day": "Mon",
+            "slot": 2
+        },
+        {
+            "class": "26",
+            "subject": "4",
+            "teacher": "8",
+            "day": "Mon",
+            "slot": 3
+        },
+        {
+            "class": "26",
+            "subject": "4",
+            "teacher": "8",
+            "day": "Mon",
+            "slot": 4
+        },
+        {
+            "class": "26",
+            "subject": "4",
+            "teacher": "8",
+            "day": "Mon",
+            "slot": 5
+        },
+        {
+            "class": "26",
+            "subject": "5",
+            "teacher": "10",
+            "day": "Thu",
+            "slot": 1
+        },
+        {
+            "class": "26",
+            "subject": "5",
+            "teacher": "10",
+            "day": "Thu",
+            "slot": 2
+        },
+        {
+            "class": "26",
+            "subject": "5",
+            "teacher": "10",
+            "day": "Thu",
+            "slot": 3
+        },
+        {
+            "class": "26",
+            "subject": "5",
+            "teacher": "10",
+            "day": "Thu",
+            "slot": 4
+        },
+        {
+            "class": "26",
+            "subject": "6",
+            "teacher": "9",
+            "day": "Sun",
+            "slot": 1
+        },
+        {
+            "class": "26",
+            "subject": "6",
+            "teacher": "9",
+            "day": "Sun",
+            "slot": 2
+        },
+        {
+            "class": "26",
+            "subject": "6",
+            "teacher": "9",
+            "day": "Sun",
+            "slot": 3
+        },
+        {
+            "class": "26",
+            "subject": "7",
+            "teacher": "3",
+            "day": "Wed",
+            "slot": 4
+        },
+        {
+            "class": "27",
+            "subject": "1",
+            "teacher": "7",
+            "day": "Sun",
+            "slot": 2
+        },
+        {
+            "class": "27",
+            "subject": "1",
+            "teacher": "7",
+            "day": "Sun",
+            "slot": 3
+        },
+        {
+            "class": "27",
+            "subject": "1",
+            "teacher": "7",
+            "day": "Sun",
+            "slot": 4
+        },
+        {
+            "class": "27",
+            "subject": "1",
+            "teacher": "7",
+            "day": "Sun",
+            "slot": 5
+        },
+        {
+            "class": "27",
+            "subject": "2",
+            "teacher": "4",
+            "day": "Tue",
+            "slot": 4
+        },
+        {
+            "class": "27",
+            "subject": "2",
+            "teacher": "4",
+            "day": "Wed",
+            "slot": 1
+        },
+        {
+            "class": "27",
+            "subject": "2",
+            "teacher": "4",
+            "day": "Wed",
+            "slot": 4
+        },
+        {
+            "class": "27",
+            "subject": "3",
+            "teacher": "2",
+            "day": "Mon",
+            "slot": 3
+        },
+        {
+            "class": "27",
+            "subject": "3",
+            "teacher": "2",
+            "day": "Mon",
+            "slot": 4
+        },
+        {
+            "class": "27",
+            "subject": "3",
+            "teacher": "2",
+            "day": "Mon",
+            "slot": 5
+        },
+        {
+            "class": "27",
+            "subject": "3",
+            "teacher": "2",
+            "day": "Tue",
+            "slot": 3
+        },
+        {
+            "class": "27",
+            "subject": "3",
+            "teacher": "2",
+            "day": "Tue",
+            "slot": 6
+        },
+        {
+            "class": "27",
+            "subject": "3",
+            "teacher": "2",
+            "day": "Tue",
+            "slot": 7
+        },
+        {
+            "class": "27",
+            "subject": "4",
+            "teacher": "11",
+            "day": "Thu",
+            "slot": 1
+        },
+        {
+            "class": "27",
+            "subject": "4",
+            "teacher": "11",
+            "day": "Thu",
+            "slot": 2
+        },
+        {
+            "class": "27",
+            "subject": "4",
+            "teacher": "11",
+            "day": "Thu",
+            "slot": 3
+        },
+        {
+            "class": "27",
+            "subject": "4",
+            "teacher": "11",
+            "day": "Thu",
+            "slot": 4
+        },
+        {
+            "class": "27",
+            "subject": "4",
+            "teacher": "11",
+            "day": "Thu",
+            "slot": 5
+        },
+        {
+            "class": "27",
+            "subject": "6",
+            "teacher": "4",
+            "day": "Tue",
+            "slot": 2
+        },
+        {
+            "class": "27",
+            "subject": "6",
+            "teacher": "4",
+            "day": "Tue",
+            "slot": 5
+        },
+        {
+            "class": "27",
+            "subject": "6",
+            "teacher": "4",
+            "day": "Wed",
+            "slot": 2
+        },
+        {
+            "class": "27",
+            "subject": "5",
+            "teacher": "2",
+            "day": "Mon",
+            "slot": 1
+        },
+        {
+            "class": "27",
+            "subject": "5",
+            "teacher": "2",
+            "day": "Mon",
+            "slot": 2
+        },
+        {
+            "class": "27",
+            "subject": "5",
+            "teacher": "2",
+            "day": "Mon",
+            "slot": 7
+        },
+        {
+            "class": "27",
+            "subject": "5",
+            "teacher": "2",
+            "day": "Tue",
+            "slot": 1
+        },
+        {
+            "class": "27",
+            "subject": "7",
+            "teacher": "7",
+            "day": "Sun",
+            "slot": 1
+        }
+    ]
+}

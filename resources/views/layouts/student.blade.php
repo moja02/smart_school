@@ -26,9 +26,8 @@
             <i class="fas fa-home"></i> ملخصي الدراسي
         </a>
 
-        <a class="dropdown-item" href="{{ route('profile.edit') }}">
-            <i class="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i>
-            الملف الشخصي
+        <a href="{{ route('student.profile') }}" class="{{ request()->routeIs('student.profile') ? 'active' : '' }}">
+            <i class="fas fa-user-circle"></i> الملف الشخصي
         </a>
 
         <a href="{{ route('student.schedule') }}" class="{{ request()->routeIs('student.schedule') ? 'active' : '' }}">

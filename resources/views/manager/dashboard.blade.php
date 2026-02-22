@@ -63,25 +63,22 @@
             </div>
         </div>
     </div>
+
     <div class="col-md-3">
-    <div class="card border-0 shadow-sm h-100 py-2 border-start border-4 border-warning">
-        <div class="card-body">
-            <div class="row no-gutters align-items-center">
-                <div class="col mr-2">
-                    <div class="text-xs fw-bold text-warning text-uppercase mb-1">سجل النشاطات</div>
-                    {{-- عرض عدد العمليات المسجلة --}}
-                    <div class="h3 mb-0 fw-bold text-dark">{{ $stats['logs_count'] ?? 0 }}</div>
-                </div>
-                <div class="col-auto">
-                    <a href="{{ route('manager.system_logs') }}">
-                        <i class="fas fa-history fa-2x text-warning opacity-25"></i>
-                    </a>
+        <div class="card border-0 shadow-sm h-100 py-2 border-start border-4 border-warning">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs fw-bold text-warning text-uppercase mb-1">حضور اليوم</div>
+                        <div class="h3 mb-0 fw-bold text-dark">{{ $stats['today_attendance'] }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-check-circle fa-2x text-gray-300 text-warning opacity-25"></i>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    </div>
-
 </div>
 
 <div class="row">
