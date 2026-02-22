@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 class SchoolClass extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
     protected $table = 'classes';
     protected $guarded = [];
     protected $fillable = [
@@ -28,14 +29,17 @@ class SchoolClass extends Model
         return $this->belongsToMany(Subject::class, 'teacher_subject', 'class_id', 'subject_id')
                     ->withPivot('teacher_id');
     }
-
-    public function schedules()
-    {
-        return $this->hasMany(Schedule::class, 'class_id');
-    }
     public function grade()
     {
         return $this->belongsTo(Grade::class);
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name', 'section', 'grade_id'])
+            ->logOnlyDirty()
+            ->useLogName('إدارة الفصول');
     }
 }
 

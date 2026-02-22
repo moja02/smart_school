@@ -135,9 +135,23 @@
             <form action="{{ route('admin.subjects.store') }}" method="POST">
                 @csrf
                 <div class="modal-body p-4">
+                    
+                    {{-- ✅ كود سحري لعرض أخطاء الحفظ باش ما تقعدش دايخ --}}
+                    @if ($errors->any())
+                        <div class="alert alert-danger p-2 small">
+                            <ul class="mb-0">
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
+                    {{-- إرسال الـ school_id تلقائياً في الخلفية (مهم جداً للأنظمة المشتركة) --}}
+                    <input type="hidden" name="school_id" value="{{ auth()->user()->school_id }}">
+
                     <div class="mb-3">
                         <label class="fw-bold small mb-1">الصف الدراسي</label>
-                        {{-- ✅ القائمة المنسدلة تعرض الصفوف المتاحة فقط --}}
                         <select name="grade_id" class="form-select" required>
                             @foreach($grades as $g) 
                                 <option value="{{ $g->id }}">{{ $g->name }}</option> 
@@ -148,10 +162,6 @@
                         <label class="fw-bold small mb-1">اسم المادة</label>
                         <input type="text" name="name" class="form-control" required>
                     </div>
-                    <div class="mb-3">
-                        <label class="fw-bold small mb-1">عدد الحصص</label>
-                        <input type="number" name="weekly_classes" class="form-control" value="2" required>
-                    </div>
                 </div>
                 <div class="modal-footer bg-light p-2">
                     <button type="submit" class="btn btn-primary w-100">حفظ المادة</button>
@@ -160,6 +170,15 @@
         </div>
     </div>
 </div>
+
+@if($errors->any())
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        var myModal = new bootstrap.Modal(document.getElementById('addSubjectModal'));
+        myModal.show();
+    });
+</script>
+@endif
 
 {{-- ========================== --}}
 {{-- 🟡 نافذة تعديل مادة (Edit Modal) --}}

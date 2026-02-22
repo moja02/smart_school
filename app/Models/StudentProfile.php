@@ -4,18 +4,17 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 class StudentProfile extends Model
 {
     protected $guarded = [];
 
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $fillable = [
         'user_id',
-        'class_id',
-        'phone',      
-        'address',    
-        'birth_date', 
+        'class_id', 
     ];
     // العلاقة مع المستخدم الأساسي (الاسم، الايميل..)
     public function user()
@@ -38,5 +37,13 @@ class StudentProfile extends Model
     public function assessmentMarks()
     {
         return $this->hasMany(AssessmentMark::class, 'student_id');
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['user_id', 'class_id'])
+            ->logOnlyDirty()
+            ->useLogName('سجلات الطلاب الأكاديمية');
     }
 }

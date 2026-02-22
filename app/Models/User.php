@@ -2,22 +2,24 @@
 
 namespace App\Models;
 
-// ✅ 1. استدعاءات الـ Traits الأساسية
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory; // كان ناقصاً
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
-
-// ✅ 2. استدعاء الموديلات المرتبطة
 use App\Models\StudentProfile;
 use App\Models\School;
-use App\Models\Subject; // كان ناقصاً للعلاقات بالأسفل
+use App\Models\Subject; 
+//   السطرين الخاصين بمكتبة المراقبة
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable, HasRoles;
+
+    use LogsActivity;
 
     protected $fillable = [
         'name',
@@ -25,6 +27,9 @@ class User extends Authenticatable
         'password',
         'role',
         'school_id',
+        'phone',       
+        'address',     
+        'birth_date',
     ];
 
     protected $hidden = [
@@ -40,14 +45,23 @@ class User extends Authenticatable
         ];
     }
 
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            // حدد الحقول التي تهمك مراقبتها عند التعديل
+            ->logOnly(['name', 'email', 'phone', 'address', 'school_id'])
+            // سجل فقط التغييرات الفعلية (لا تسجل إذا تم الضغط على "حفظ" بدون تغيير شيء)
+            ->logOnlyDirty()
+            // لا تسجل الحركات الفارغة
+            ->dontSubmitEmptyLogs()
+            // تخصيص اسم السجل ليكون واضحاً للمدير
+            ->useLogName('المستخدمين');
+    }
+
     // ===========================
     // العلاقات (Relationships)
     // ===========================
 
-    // public function school()
-    // {
-    //     return $this->belongsTo(School::class);
-    // }
 
     public function children()
     {
@@ -131,16 +145,4 @@ class User extends Authenticatable
         // الطالب ينتمي إلى شعبة واحدة (التي جدولها هو classes)
         return $this->belongsTo(SchoolClass::class, 'class_id'); 
     }
-
-    public function schedules()
-    {
-        return $this->hasMany(Schedule::class, 'teacher_id');
-    }
-    
-    public function preferences()
-{
-    return $this->hasMany(TeacherPreference::class, 'teacher_id');
-}
-
-
 } 
