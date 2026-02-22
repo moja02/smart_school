@@ -75,11 +75,7 @@
         <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'active' : '' }}">
             <i class="fas fa-home"></i> الرئيسية
         </a>
-
-        <a class="dropdown-item" href="{{ route('profile.edit') }}">
-            <i class="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i>
-            الملف الشخصي
-        </a>
+        
         
         <a href="{{ route('admin.users') }}" class="{{ request()->routeIs('admin.users*') ? 'active' : '' }}">
             <i class="fas fa-users-cog"></i> إدارة المستخدمين

@@ -12,6 +12,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use App\Models\TeacherPreference;
+use App\Models\Schedule;
+use Illuminate\Support\Facades\Storage;
+
+
 
 class AdminController extends Controller
 {
@@ -781,37 +786,28 @@ public function printCertificate($studentId)
     // حفظ التوزيع وإرساله (تحديث الدرجات)
     public function storeGradeSettings(Request $request)
     {
-        // حماية لو تم الضغط على حفظ بدون مواد
-        if (!$request->has('subject_id')) {
-            return redirect()->back()->with('error', 'لا توجد مواد لحفظها');
-        }
-
         $schoolId = auth()->user()->school_id;
 
         foreach ($request->subject_id as $index => $subjectId) {
-            $works = $request->works_score[$index] ?? 40;
-            $final = $request->final_score[$index] ?? 60;
-            $total = $works + $final; // نحسبوا المجموع برمجياً للضمان
-            $classes = $request->weekly_classes[$index] ?? 1;
+            // جلب المادة للحصول على عدد حصصها الافتراضي إذا لزم الأمر
+            $subject = \App\Models\Subject::find($subjectId);
 
-            // نحفظوا أو نحدثوا البيانات في جدول الإعدادات
             \DB::table('school_subject_settings')->updateOrInsert(
+                ['school_id' => $schoolId, 'subject_id' => $subjectId],
                 [
-                    'school_id'  => $schoolId, 
-                    'subject_id' => $subjectId
-                ],
-                [
-                    'weekly_classes' => $classes,
-                    'works_score'    => $works,
-                    'final_score'    => $final,
-                    'total_score'    => $total,
-                    'created_at'     => now(),
-                    'updated_at'     => now()
+                    'weekly_classes' => $request->weekly_classes[$index],
+                    'works_score' => $request->works_score[$index],
+                    'final_score' => $request->final_score[$index],
+                    'total_score' => $request->works_score[$index] + $request->final_score[$index],
+                    // نرسل القيمة الحالية للمادة حتى لا يشتكي سيكويل
+                    'weekly_classes' => $subject->weekly_classes ?? 0, 
+                    'created_at' => now(),
+                    'updated_at'  => now()
                 ]
             );
         }
 
-        return redirect()->back()->with('success', 'تم حفظ إعدادات المواد بنجاح ✅');
+        return back()->with('success', 'تم حفظ توزيع الدرجات بنجاح ✅');
     }
     public function listSubjects()
     {
@@ -839,49 +835,49 @@ public function printCertificate($studentId)
 
     public function storeSubject(Request $request)
 {
-    // 1. التحقق (جعلنا عدد الحصص اختياري nullable)
+    // 1. التحقق من البيانات
     $request->validate([
         'name'           => 'required|string|max:255',
         'grade_id'       => 'required|exists:grades,id',
-        'weekly_classes' => 'nullable|integer|min:1|max:20', 
+        'weekly_classes' => 'required|integer|min:1|max:20',
     ]);
 
-    // 2. الحفظ مع قيمة افتراضية
+    // 2. الحفظ في قاعدة البيانات
     \App\Models\Subject::create([
         'name'           => $request->name,
+        'weekly_classes' => $request->weekly_classes,
         'grade_id'       => $request->grade_id,
-        'school_id'      => auth()->user()->school_id,
-        // إذا لم يتم إرسال عدد الحصص، سيتم وضع 1 تلقائياً
-        'weekly_classes' => $request->weekly_classes ?? 1, 
+        'school_id'      => auth()->user()->school_id, // يربطها بالمدرسة إذا كان الحساب مدرسة
+        // ⚠️ ملاحظة هامة: لقد أزلت max_score و pass_score تماماً من هنا
     ]);
 
     return redirect()->back()->with('success', 'تم إضافة المادة بنجاح ✅');
 }
 
-public function updateSubject(Request $request)
-{
-    // التحقق من البيانات (بدون عدد الحصص)
-    $request->validate([
-        'subject_id' => 'required|exists:subjects,id',
-        'name'       => 'required|string|max:255',
-        'grade_id'   => 'required|exists:grades,id',
-    ]);
+    public function updateSubject(Request $request)
+    {
+        $request->validate([
+            'subject_id'     => 'required|exists:subjects,id',
+            'name'           => 'required|string|max:255',
+            'weekly_classes' => 'required|integer|min:1|max:20',
+            'grade_id'       => 'required|exists:grades,id',
+        ]);
 
-    $subject = \App\Models\Subject::findOrFail($request->subject_id);
+        $subject = Subject::findOrFail($request->subject_id);
 
-    // حماية: التأكد أن المادة خاصة بالمدرسة وليست عامة
-    if ($subject->school_id != auth()->user()->school_id) {
-        return redirect()->back()->with('error', 'عذراً، لا يمكنك تعديل المواد العامة أو مواد مدارس أخرى.');
+        // حماية: التأكد أن المادة خاصة بالمدرسة وليست عامة
+        if ($subject->school_id != auth()->user()->school_id) {
+            return redirect()->back()->with('error', 'عذراً، لا يمكنك تعديل المواد العامة أو مواد مدارس أخرى.');
+        }
+
+        $subject->update([
+            'name'           => $request->name,
+            'weekly_classes' => $request->weekly_classes,
+            'grade_id'       => $request->grade_id,
+        ]);
+
+        return redirect()->back()->with('success', 'تم تعديل بيانات المادة بنجاح ✅');
     }
-
-    // التحديث
-    $subject->update([
-        'name'       => $request->name,
-        'grade_id'   => $request->grade_id,
-    ]);
-
-    return redirect()->back()->with('success', 'تم تعديل بيانات المادة بنجاح ✅');
-}
 
     // 2. دالة حذف مادة
     public function deleteSubject($id)
@@ -942,7 +938,7 @@ public function updateSubject(Request $request)
                                 ->pluck('teacher_name', 'section_id')->toArray();
         }
 
-        $teachers = \App\Models\User::where('school_id', $schoolId)->where('role', 'teacher')->get();
+        $teachers = User::where('school_id', $schoolId)->where('role', 'teacher')->get();
 
         return view('admin.subjects.assign', compact('grades', 'subjects', 'sections', 'assignedSections', 'teachers'));
     }
@@ -1141,18 +1137,221 @@ public function updateSubject(Request $request)
 
         return back()->with('success', 'تم تسكين الطالب في الفصل بنجاح.');
     }
-
-    public function toggleGrading()
+    
+public function showSchedules()
     {
-        $schoolId = auth()->user()->school_id;
-        $school = \App\Models\School::find($schoolId);
-        
-        // عكس الحالة الحالية
-        $school->grading_locked = !$school->grading_locked;
-        $school->save();
+        // جلب الجداول مجمعة حسب الفصول
+        $classes = SchoolClass::with(['schedules.subject', 'schedules.teacher'])->get();
 
-        $status = $school->grading_locked ? 'تم إغلاق الرصد 🔒' : 'تم فتح الرصد 🔓';
-        return back()->with('success', $status);
+        // جلب الجداول مجمعة حسب المعلمين
+        $teachers = User::role('teacher')->with(['schedules.subject', 'schedules.schoolClass'])->get();
+
+        $days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+        $periods = [1, 2, 3, 4, 5, 6];
+
+        return view('admin.schedules.index', compact('classes', 'teachers', 'days', 'periods'));
+    }
+
+    /**
+     * 2. صفحة قائمة المعلمين لتعديل التفضيلات
+     */
+ public function preferencesList()
+{
+    // جلب المعلمين مع تحميل التفضيلات مسبقاً لتوفير الاستعلامات (Eager Loading)
+    $teachers = \App\Models\User::role('teacher')
+                ->with(['preferences']) // تأكد من تعريف العلاقة في موديل User
+                ->get();
+
+    return view('admin.schedules.preferences', compact('teachers'));
+}
+
+    /**
+     * 3. صفحة تعديل تفضيلات معلم معين
+     */
+    public function editPreference($id)
+{
+    $unreadCount = 0;
+    $teacher = User::findOrFail($id);
+    
+    // جلب التفضيلات المخزنة مسبقاً وتحويلها لمصفوفة مفهرسة باليوم
+    $preferences = TeacherPreference::where('teacher_id', $id)
+                    ->get()
+                    ->keyBy('day_name');
+    
+    $days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+    $periods = [1, 2, 3, 4, 5, 6, 7]; // عدد الحصص في مدرستك
+
+    return view('admin.schedules.edit_preference', compact('teacher', 'preferences', 'days', 'periods', 'unreadCount'));
+}
+
+    /**
+     * 4. حفظ التفضيلات في قاعدة البيانات
+     */
+    public function storePreference(Request $request, $id)
+{
+    $data = $request->input('prefs', []);
+
+    // الأيام المتاحة في النظام
+    $allDays = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+
+    foreach ($allDays as $day) {
+        $dayData = $data[$day] ?? null;
+
+        $isDayOff = isset($dayData['off']) ? 1 : 0;
+        // إذا كان اليوم "أوف"، نخزن الحصص كمصفوفة فارغة أو نلغيها، 
+        // أما إذا لم يكن أوف، نأخذ أرقام الحصص التي تم اختيارها كـ "غير مرغوبة"
+        $blockedPeriods = (isset($dayData['periods']) && !$isDayOff) 
+                          ? array_keys($dayData['periods']) 
+                          : [];
+
+        TeacherPreference::updateOrCreate(
+            ['teacher_id' => $id, 'day_name' => $day],
+            [
+                'is_day_off' => $isDayOff,
+                'blocked_periods' => $blockedPeriods
+            ]
+        );
+    }
+
+    return redirect()->route('admin.schedules.preferences')->with('success', 'تم حفظ تفضيلات المعلم بنجاح.');
+}
+
+public function generateAutoSchedule()
+    {
+        try {
+            $schoolId = auth()->user()->school_id;
+
+            // 1. جلب المراحل (السنوات) المفعلة حالياً
+            $activeGrades = \DB::table('school_grade')
+                              ->where('school_id', $schoolId)
+                              ->pluck('grade_id')
+                              ->toArray();
+
+            // 2. الفلترة الصارمة للمتطلبات (تجاهل أي فصل أو أستاذ محذوف)
+            $assignments = \DB::table('teacher_subject_section')
+                ->join('classes', 'teacher_subject_section.section_id', '=', 'classes.id')
+                ->join('subjects', 'teacher_subject_section.subject_id', '=', 'subjects.id')
+                ->join('users', 'teacher_subject_section.teacher_id', '=', 'users.id')
+                ->leftJoin('school_subject_settings', function($join) use ($schoolId) {
+                    $join->on('teacher_subject_section.subject_id', '=', 'school_subject_settings.subject_id')
+                         ->where('school_subject_settings.school_id', '=', $schoolId);
+                })
+                ->where('teacher_subject_section.school_id', $schoolId)
+                ->whereIn('classes.grade_id', $activeGrades) 
+                ->select(
+                    'teacher_subject_section.section_id as class_id',
+                    'teacher_subject_section.subject_id',
+                    'teacher_subject_section.teacher_id',
+                    \DB::raw('COALESCE(school_subject_settings.weekly_classes, subjects.weekly_classes, 1) as weekly_sessions')
+                )
+                ->get();
+
+            if ($assignments->isEmpty()) {
+                return redirect()->back()->with('error', 'لا توجد حصص مسندة للفصول المفعلة!');
+            }
+
+            // 3. استخراج بيانات الأساتذة
+            $activeTeacherIds = $assignments->pluck('teacher_id')->unique()->toArray();
+            $teachers = \App\Models\User::whereIn('id', $activeTeacherIds)->with('preferences')->get();
+            
+            $dayMapping = [
+                'الأحد' => 'Sun', 'الاثنين' => 'Mon', 'الثلاثاء' => 'Tue', 
+                'الأربعاء' => 'Wed', 'الخميس' => 'Thu'
+            ];
+            $revDayMapping = array_flip($dayMapping);
+
+            $teachersData = [];
+            foreach ($teachers as $teacher) {
+                $unwanted = [];
+                foreach ($teacher->preferences as $pref) {
+                    $engDay = $dayMapping[$pref->day_name] ?? $pref->day_name;
+                    if ($pref->is_day_off) {
+                        $unwanted[$engDay] = [1, 2, 3, 4, 5, 6, 7];
+                    } else {
+                        $unwanted[$engDay] = $pref->blocked_periods ?? [];
+                    }
+                }
+                $teachersData[] = [
+                    'name' => (string)$teacher->id,
+                    'unwanted_slots' => $unwanted
+                ];
+            }
+
+            $requirements = [];
+            foreach ($assignments as $assign) {
+                $requirements[] = [
+                    'class' => (string)$assign->class_id,
+                    'subject' => (string)$assign->subject_id,
+                    'teacher' => (string)$assign->teacher_id,
+                    'sessions' => (int)$assign->weekly_sessions
+                ];
+            }
+
+            $inputData = [
+                'teachers' => $teachersData,
+                'requirements' => $requirements
+            ];
+
+            // 🚨 الخطوة الأهم: تدمير الملف القديم لمنع قراءة "البيانات الشبحية" المعلقة
+            $jsonPath = base_path('constraints.json');
+            if (file_exists($jsonPath)) {
+                @unlink($jsonPath); 
+            }
+            
+            // كتابة بيانات جديدة ونظيفة
+            file_put_contents($jsonPath, json_encode($inputData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+
+            // 4. تشغيل الخوارزمية (البايثون)
+            $pythonPath = base_path('scheduler.py');
+            $output = shell_exec("python \"$pythonPath\" 2>&1");
+
+            // 5. معالجة النتائج وحفظ الجدول بسلاسة
+            if (file_exists($jsonPath)) {
+                $resultData = json_decode(file_get_contents($jsonPath), true);
+                
+                if (isset($resultData['schedule']) && !empty($resultData['schedule'])) {
+                    
+                    // إيقاف مؤقت للقيود لضمان الحفظ المريح بدون أخطاء MySQL
+                    \Illuminate\Support\Facades\Schema::disableForeignKeyConstraints();
+                    \App\Models\Schedule::truncate(); 
+
+                    $successCount = 0;
+                    foreach ($resultData['schedule'] as $item) {
+                        try {
+                            \App\Models\Schedule::create([
+                                'class_id' => (int) $item['class'],
+                                'subject_id' => (int) $item['subject'],
+                                'teacher_id' => (int) $item['teacher'],
+                                'day' => $revDayMapping[$item['day']] ?? $item['day'],
+                                'period' => $item['slot']
+                            ]);
+                            $successCount++;
+                        } catch (\Throwable $e) {
+                            // تجاهل أي خطأ فردي لتمرير باقي الجدول
+                            continue; 
+                        }
+                    }
+                    
+                    // إعادة تفعيل القيود
+                    \Illuminate\Support\Facades\Schema::enableForeignKeyConstraints();
+
+                    if ($successCount > 0) {
+                        return redirect()->back()->with('success', "تم التوليد بنجاح! 🚀 ($successCount حصة تم حفظها)");
+                    } else {
+                        return redirect()->back()->with('error', 'تم توليد الجدول لكن لم تحفظ الحصص.');
+                    }
+                } 
+                elseif (isset($resultData['error'])) {
+                    return redirect()->back()->with('error', 'فشل التوليد. السبب: ' . $resultData['error']);
+                }
+            }
+
+            return redirect()->back()->with('error', 'حدث خطأ في النظام. التفاصيل: ' . ($output ?: 'لم يتم إرجاع أي بيانات.'));
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Schema::enableForeignKeyConstraints();
+            return redirect()->back()->with('error', 'خطأ فني: ' . $e->getMessage());
+        }
     }
     
 }

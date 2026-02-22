@@ -1,10 +1,10 @@
 @extends(
     Auth::user()->role == 'admin' ? 'layouts.admin' : 
-    (Auth::user()->role == 'manager' ? 'layouts.manager' :  
     (Auth::user()->role == 'teacher' ? 'layouts.teacher' : 
     (Auth::user()->role == 'student' ? 'layouts.student' : 
-    (Auth::user()->role == 'parent' ? 'layouts.parent' : 'layouts.admin')))) 
+    (Auth::user()->role == 'parent' ? 'layouts.parent' : 'layouts.app')))
 )
+
 @section('content')
 
 <style>
@@ -22,27 +22,7 @@
     .message-received { align-self: flex-start; background: #fff; border: 1px solid #dee2e6; border-bottom-right-radius: 2px; }
     .message-time { font-size: 0.75rem; margin-top: 5px; opacity: 0.8; display: block; text-align: left; }
     .message-sent .message-time { color: #e0e0e0; }
-    .input-area { 
-        padding: 20px;
-        background: #fff;
-        border-top: 1px solid #dee2e6;
-        flex-shrink: 0;
-    }
-    .badge.x-small {
-    padding: 0.35em 0.65em;
-    font-weight: 500;
-    }
-    .user-item.active {
-        border-right: 4px solid #0d6efd; /* تمييز المستخدم النشط */
-    }
-    .user-avatar {
-        background: linear-gradient(45deg, #6c757d, #adb5bd) !important;
-        color: white !important;
-    }
-    /* إذا كان المستخدم مديراً، نغير لون الأفاتار الخاص به للتميز */
-    .user-item[data-role="manager"] .user-avatar {
-        background: linear-gradient(45deg, #dc3545, #ff4757) !important;
-    }
+    .input-area { padding: 20px; background: #fff; border-top: 1px solid #dee2e6; flex-shrink: 0; }
 </style>
 
 <div class="card page-header-card mb-4 shadow">
@@ -74,42 +54,19 @@
         <div id="usersContainer">
             @foreach($users as $user)
                 {{-- تمت إضافة الكلاس search-item هنا --}}
-                <a href="{{ route('messages.chat', $user->id) }}" class="user-item {{ isset($receiver) && $receiver->id == $user->id ? 'active' : '' }} search-item">
-            <div class="user-avatar shadow-sm">
-                {{ mb_substr($user->name, 0, 1) }}
-            </div>
-            <div class="ms-3 flex-grow-1">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0 search-name">{{ $user->name }}</h6>
-                    
-                    {{-- إضافة الشارات الملونة هنا --}}
-                    @php
-                        $badgeClass = [
-                            'manager' => 'bg-danger',
-                            'admin'   => 'bg-primary',
-                            'teacher' => 'bg-success',
-                            'parent'  => 'bg-info text-dark',
-                            'student' => 'bg-warning text-dark'
-                        ][$user->role] ?? 'bg-secondary';
-
-                        $roleName = [
-                            'manager' => 'المدير',
-                            'admin'   => 'الإدارة',
-                            'teacher' => 'معلم',
-                            'parent'  => 'ولي أمر',
-                            'student' => 'طالب'
-                        ][$user->role] ?? 'مستخدم';
-                    @endphp
-                    <span class="badge {{ $badgeClass }} rounded-pill x-small shadow-sm" style="font-size: 0.7rem;">
-                        {{ $roleName }}
-                    </span>
-                </div>
-                
-                @if($user->last_message)
-                    <small class="text-muted d-block text-truncate" style="max-width: 150px;">{{ $user->last_message }}</small>
-                @endif
-            </div>
-        </a>
+                <a href="{{ route('messages.chat', $user->id) }}" class="user-item search-item {{ isset($receiver) && $receiver->id == $user->id ? 'active' : '' }}">
+                    <div class="user-avatar shadow-sm">{{ substr($user->name, 0, 1) }}</div>
+                    <div>
+                        {{-- تمت إضافة الكلاس search-name هنا --}}
+                        <div class="fw-bold text-dark search-name">{{ $user->name }}</div>
+                        <small class="text-muted" style="font-size: 0.8rem;">
+                            @if($user->role == 'admin') <i class="fas fa-user-shield text-danger"></i> مدير 
+                            @elseif($user->role == 'teacher') <i class="fas fa-chalkboard-teacher text-success"></i> معلم 
+                            @elseif($user->role == 'student') <i class="fas fa-user-graduate text-primary"></i> طالب 
+                            @else <i class="fas fa-user-friends text-warning"></i> ولي أمر @endif
+                        </small>
+                    </div>
+                </a>
             @endforeach
         </div>
         {{-- رسالة عند عدم وجود نتائج --}}
@@ -121,17 +78,11 @@
     {{-- منطقة المحادثة --}}
     <div class="chat-area">
         @if(isset($receiver))
-            <div class="chat-header p-3 border-bottom bg-white d-flex align-items-center shadow-sm">
-                <div class="user-avatar me-3">
-                    {{ mb_substr($receiver->name, 0, 1) }}
-                </div>
-                <div>
-                    <h5 class="mb-0 fw-bold">{{ $receiver->name }}</h5>
-                    <small class="text-muted">
-                        <i class="fas fa-circle text-success small"></i> 
-                        {{-- عرض الرتبة في الهيدر --}}
-                        {{ $roleName }} 
-                    </small>
+            <div class="chat-header shadow-sm">
+                <div class="user-avatar bg-primary text-white">{{ substr($receiver->name, 0, 1) }}</div>
+                <div class="me-3">
+                    <h5 class="m-0 fw-bold">{{ $receiver->name }}</h5>
+                    <small class="text-success"><i class="fas fa-circle" style="font-size: 8px;"></i> متاح للمحادثة</small>
                 </div>
             </div>
 
