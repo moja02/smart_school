@@ -20,29 +20,43 @@ class TeacherController extends Controller
     {
         $teacherId = \Illuminate\Support\Facades\Auth::id();
 
-        // 1. جلب الفصول التي يدرسها المعلم
-        $classes = \App\Models\SchoolClass::whereHas('subjects', function($query) use ($teacherId) {
-            $query->where('teacher_subject.teacher_id', $teacherId);
-        })->distinct()->get();
+        // 1. جلب الفصول (الشعب) التي يدرسها المعلم
+        $classes = \Illuminate\Support\Facades\DB::table('teacher_subject_section')
+            ->join('classes', 'teacher_subject_section.section_id', '=', 'classes.id')
+            ->where('teacher_subject_section.teacher_id', $teacherId)
+            ->select('classes.*')
+            ->distinct()
+            ->get();
 
         // 2. حساب إجمالي عدد الطلاب في هذه الفصول
-        $studentsCount = \App\Models\StudentProfile::whereIn('class_id', $classes->pluck('id'))->count();
+        // ✅ التعديل: استخدام جدول student_profiles بدلاً من users
+        // تأكد أن اسم الجدول لديك هو 'student_profiles' واسم العمود 'class_id' أو 'section_id'
+        $studentsCount = \Illuminate\Support\Facades\DB::table('student_profiles')
+            ->whereIn('class_id', $classes->pluck('id')) // إذا كان العمود اسمه section_id غيره هنا
+            ->count();
+
+        /* ملاحظة: إذا لم يكن لديك جدول student_profiles، 
+        وكان الطلاب مرتبطين بالفصل في جدول users مباشرة، 
+        تأكد من أن العمود في قاعدة البيانات اسمه class_id أو section_id وعدل الكود أعلاه.
+        */
 
         // 3. حساب عدد المواد التي يدرسها المعلم
-        // نستخدم DB table مباشرة للأداء الأفضل أو عبر الموديل
-        $subjectsCount = \Illuminate\Support\Facades\DB::table('teacher_subject')
-                            ->where('teacher_id', $teacherId)
-                            ->distinct('subject_id')
-                            ->count();
+        $subjectsCount = \Illuminate\Support\Facades\DB::table('teacher_subject_section')
+            ->where('teacher_id', $teacherId)
+            ->distinct('subject_id')
+            ->count('subject_id');
 
-        // 4. آخر الرسائل الواردة (تنبيهات سريعة)
+        // 4. عدد الفصول للعرض
+        $classesCount = $classes->count();
+
+        // 5. آخر الرسائل
         $recentMessages = \App\Models\Message::where('receiver_id', $teacherId)
-                            ->where('is_read', 0)
-                            ->latest()
-                            ->take(5)
-                            ->get();
+            ->where('is_read', 0)
+            ->latest()
+            ->take(5)
+            ->get();
 
-        return view('teacher.dashboard', compact('classes', 'studentsCount', 'subjectsCount', 'recentMessages'));
+        return view('teacher.dashboard', compact('classes', 'classesCount', 'studentsCount', 'subjectsCount', 'recentMessages'));
     }
 
     public function students(Request $request)
@@ -91,66 +105,196 @@ class TeacherController extends Controller
 
     
     // 1. دالة عرض نموذج إضافة الدرجة
-    public function createGrade($student_id)
+    public function createGrades($subjectId, $sectionId)
     {
-    //$student = StudentProfile::with('user')->findOrFail($student_id);
-    $student = \App\Models\StudentProfile::with('user')->findOrFail($student_id);
-    // قائمة مواد مقترحة (يمكنك تغييرها)
-    //$subjects = ['الرياضيات', 'اللغة العربية', 'العلوم', 'اللغة الإنجليزية', 'التربية الإسلامية', 'الحاسب الآلي'];
-    $subjects = \Illuminate\Support\Facades\Auth::user()->teaching()->pluck('subjects.name');
-    return view('teacher.create_grade', compact('student', 'subjects'));
+        $teacherId = auth()->user()->id;
+
+        // 1. التحقق من أن المعلم يدرس هذه المادة وهذه الشعبة
+        $hasAccess = \DB::table('teacher_subject_section')
+            ->where('teacher_id', $teacherId)
+            ->where('subject_id', $subjectId)
+            ->where('section_id', $sectionId)
+            ->exists();
+
+        if (!$hasAccess) {
+            abort(403, 'غير مصرح لك برصد درجات هذا الفصل.');
+        }
+
+        // 2. جلب بيانات المادة والشعبة
+        $subject = \DB::table('subjects')->find($subjectId);
+        $section = \DB::table('classes')->find($sectionId); // الجدول اسمه classes في قاعدتك
+        $grade = \DB::table('grades')->find($section->grade_id);
+
+        // 3. جلب الطلاب المرتبطين بهذه الشعبة
+        // نعتمد على جدول student_profiles للربط بين الطالب والشعبة
+        $students = \App\Models\User::whereHas('studentProfile', function($q) use ($sectionId) {
+            $q->where('class_id', $sectionId);
+        })->orderBy('name')->get();
+
+        // 4. جلب الدرجات السابقة (إن وجدت) لعرضها في الخانات
+        // ملاحظة: نفترض أنك أنشأت جدول student_scores كما اتفقنا سابقاً
+        $currentScores = \DB::table('student_scores')
+            ->where('subject_id', $subjectId)
+            ->where('class_id', $sectionId)
+            ->get()
+            ->keyBy('student_id');
+
+        return view('teacher.grades.create', compact('subject', 'section', 'grade', 'students', 'currentScores'));
     }
+
     // 2. دالة حفظ الدرجة
-    public function storeGrade(Request $request, $student_id)
-    {
-    // التحقق من البيانات
-    $request->validate([
-        'subject' => 'required',
-        'total_score' => 'required|numeric|min:0|max:100',
-        ]);
-            
-    // حفظ أو تحديث الدرجة
-    Grade::updateOrCreate(
-    [
-    'student_id' => $student_id,
-    'subject' => $request->subject
-    ],
-    [
-    'total_score' => $request->total_score,
-    'max_score' => 100,
-    'term' => 'الفصل الدراسي الأول'
-    ]
-    );
+    public function storeGrades(Request $request)
+{
+    $isLocked = \DB::table('schools')->where('id', auth()->user()->school_id)->value('grading_locked');
     
-    return redirect()->route('teacher.class', StudentProfile::find($student_id)->class_id)
-    ->with('success', 'تم رصد الدرجة بنجاح!');
+    if ($isLocked) {
+        return back()->with('error', 'عذراً، تم إغلاق باب رصد الدرجات من قبل الإدارة. لا يمكن التعديل حالياً.');
+    }
+    // التحقق من صحة البيانات
+    $request->validate([
+        'grades' => 'array',
+        'subject_id' => 'required',
+        'section_id' => 'required'
+    ]);
+
+    foreach ($request->grades as $studentId => $scores) {
+        // إذا الحقل فارغ نعتبره 0
+        $works = $scores['works'] ?? 0;
+        $final = $scores['final'] ?? 0;
+        $total = $works + $final;
+
+        // الحفظ أو التحديث في جدول الدرجات
+        \DB::table('student_scores')->updateOrInsert(
+            [
+                'student_id' => $studentId,
+                'subject_id' => $request->subject_id,
+                'class_id'   => $request->section_id, // انتبه: في جدول الدرجات سميناه class_id
+            ],
+            [
+                'school_id' => auth()->user()->school_id,
+                'works_score' => $works,
+                'final_score' => $final,
+                'total_score' => $total,
+                'academic_year' => date('Y'),
+                'semester' => 'first', // يمكنك جعلها ديناميكية لاحقاً
+                'updated_at' => now(),
+            ]
+        );
+    }
+
+    return back()->with('success', 'تم حفظ الدرجات بنجاح ✅');
+}
+
+    public function editFinalGrades($subjectId, $sectionId)
+    {
+        $teacherId = auth()->user()->id;
+        $isLocked = \DB::table('schools')->where('id', auth()->user()->school_id)->value('grading_locked');
+
+        // جلب البيانات الأساسية
+        $subject = \DB::table('subjects')->find($subjectId);
+        $section = \DB::table('classes')->find($sectionId);
+        $grade = \DB::table('grades')->find($section->grade_id);
+
+        // جلب الطلاب ودرجاتهم من الجدول الرئيسي
+        $students = \App\Models\User::role('student')
+            ->whereHas('studentProfile', function($q) use ($sectionId) {
+                $q->where('class_id', $sectionId);
+            })
+            ->orderBy('name')
+            ->get();
+
+        $scores = \DB::table('student_scores')
+            ->where('subject_id', $subjectId)
+            ->where('class_id', $sectionId)
+            ->get()
+            ->keyBy('student_id');
+
+        // جلب الدرجة العظمى للنهائي من إعدادات المادة (مثلاً 60)
+        $maxFinal = \DB::table('school_subject_settings')
+            ->where('school_id', auth()->user()->school_id)
+            ->value('final_score') ?? 60;
+
+        return view('teacher.assessments.final_edit', compact('subject', 'section', 'grade', 'students', 'scores', 'isLocked', 'maxFinal'));
+    }
+
+    public function storeFinalGrades(Request $request)
+    {
+        $isLocked = \DB::table('schools')->where('id', auth()->user()->school_id)->value('grading_locked');
+        if ($isLocked) return back()->with('error', 'الرصد مغلق حالياً 🔒');
+
+        foreach ($request->final_marks as $studentId => $mark) {
+            \DB::table('student_scores')->updateOrInsert(
+                [
+                    'student_id' => $studentId,
+                    'subject_id' => $request->subject_id,
+                    'class_id'   => $request->section_id,
+                ],
+                [
+                    'school_id' => auth()->user()->school_id,
+                    'final_score' => $mark ?? 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
+
+        }
+
+        return back()->with('success', 'تم رصد درجات الامتحان النهائي بنجاح ✅');
     }
 
     // عرض قائمة الفصول الدراسية للمعلم
     public function myClasses()
-    {
-        $teacherId = Auth::id();
-        
-        // جلب الفصول التي يدرسها المعلم (عبر جدول التوزيع)
-        // نستخدم distinct لمنع تكرار الفصل إذا كان المعلم يدرسه أكثر من مادة
-        $classes = \App\Models\SchoolClass::whereHas('subjects', function($query) use ($teacherId) {
-            $query->where('teacher_subject.teacher_id', $teacherId);
-            })->distinct()->get();
-            
-            return view('teacher.classes.index', compact('classes'));
-    }
-    // عرض تفاصيل فصل معين (الطلاب + المواد)
-    public function showClass($id)
-    {
-        $class = \App\Models\SchoolClass::with(['students.user', 'students.parent.user'])->findOrFail($id);
-        
-        // جلب المواد التي يدرسها هذا المعلم لهذا الفصل فقط
-        $teacherSubjects = \App\Models\Subject::whereHas('teachers', function($query) use ($class) {
-            $query->where('teacher_subject.teacher_id', Auth::id())
-                    ->where('teacher_subject.class_id', $class->id);
-        })->get();
+{
+    $teacherId = auth()->user()->id;
 
-        return view('teacher.classes.show', compact('class', 'teacherSubjects'));
+    // جلب المواد والفصول من الجدول الوسيط teacher_subject_section
+    $subjects = \DB::table('teacher_subject_section')
+        ->join('subjects', 'teacher_subject_section.subject_id', '=', 'subjects.id')
+        ->join('classes', 'teacher_subject_section.section_id', '=', 'classes.id') // استخدام section_id حسب الجدول لديك
+        ->join('grades', 'classes.grade_id', '=', 'grades.id')
+        ->where('teacher_subject_section.teacher_id', $teacherId)
+        ->select(
+            'subjects.id as subject_id',
+            'subjects.name as subject_name',
+            // تم حذف subjects.code لأنه غير موجود
+            'grades.name as grade_name',       // اسم الصف
+            'classes.section as class_section', // اسم الشعبة
+            'classes.id as class_id'            // رقم الشعبة (مهم للرابط)
+        )
+        ->get();
+
+    return view('teacher.classes.index', compact('subjects'));
+}
+    // عرض تفاصيل فصل معين (الطلاب + المواد)
+    public function showClass($subjectId, $classId)
+    {
+        $teacherId = auth()->user()->id;
+
+        // التحقق من الصلاحية
+        $hasAccess = \DB::table('teacher_subject_section')
+            ->where('teacher_id', $teacherId)
+            ->where('subject_id', $subjectId)
+            ->where('section_id', $classId)
+            ->exists();
+
+        if (!$hasAccess) {
+            abort(403, 'ليس لديك صلاحية للوصول لهذا الفصل.');
+        }
+
+        $subject = \DB::table('subjects')->find($subjectId);
+        $class = \DB::table('classes')->find($classId);
+        $grade = \DB::table('grades')->find($class->grade_id);
+
+        // جلب الطلاب
+        $students = \App\Models\User::role('student')
+            ->whereHas('studentProfile', function($q) use ($classId) {
+                $q->where('class_id', $classId);
+            })
+            ->with('studentProfile')
+            ->orderBy('name')
+            ->get();
+
+        return view('teacher.classes.show', compact('subject', 'class', 'grade', 'students'));
     }
 
     // الصفحة الرئيسية للمادة
@@ -166,45 +310,90 @@ class TeacherController extends Controller
     }
 
     // 1. إضافة الأسئلة
-    public function createQuestion($subject_id, $class_id) {
-        $subject = Subject::findOrFail($subject_id);
-        $class = SchoolClass::findOrFail($class_id);
-        $lessons = Lesson::where('subject_id', $subject_id)->get();
+    public function createQuestion($subject_id, $class_id)
+    {
+        $subject = \DB::table('subjects')->where('id', $subject_id)->first();
+        $class = \DB::table('classes')->where('id', $class_id)->first();
+
+        // ✅ التعديل هنا: استخدام section_id بدلاً من class_id
+        $lessons = \DB::table('lessons')
+                    ->where('subject_id', $subject_id)
+                    ->where('section_id', $class_id) // استخدام اسم العمود الصحيح في قاعدة البيانات
+                    ->get();
+
         return view('teacher.questions.create', compact('subject', 'class', 'lessons'));
     }
 
-    public function storeQuestion(Request $request, $subject_id, $class_id)
+    public function storeQuestion(\Illuminate\Http\Request $request)
     {
         $request->validate([
-            'lesson_id' => 'required|exists:lessons,id',
             'content' => 'required|string',
-            'type' => 'required|in:multiple_choice,true_false',
-            // تم حذف التحقق من score
-            'correct_answer' => 'required',
+            'type' => 'required|in:true_false,multiple_choice',
+            'correct_answer' => 'required|string',
+            'lesson_id' => 'nullable|exists:lessons,id',
+            'lesson_name' => 'nullable|string|max:255',
         ]);
 
-        // معالجة الخيارات (إذا كان اختيار من متعدد)
-        $options = null;
-        if ($request->type == 'multiple_choice') {
-            // حذف الخيارات الفارغة
-            $options = array_filter($request->options, function($value) {
-                return !is_null($value) && $value !== '';
-            });
-            // إعادة ترتيب المصفوفة
-            $options = array_values($options);
+        // 1. 🛑 منع التكرار: فحص هل السؤال موجود مسبقاً لنفس الفصل؟
+        $exists = \DB::table('questions')
+                    ->where('section_id', $request->class_id) // أو section_id حسب اسم العمود عندك
+                    ->where('content', $request->content)
+                    ->exists();
+
+        if ($exists) {
+            return back()->withInput()->with('error', 'هذا السؤال موجود بالفعل في بنك الأسئلة لهذا الفصل! لا داعي لإضافته مرة أخرى.');
         }
 
-        // إنشاء السؤال (بدون score)
-        \App\Models\Question::create([
-            'lesson_id' => $request->lesson_id,
+        // 2. معالجة الدرس
+        $lessonId = $request->lesson_id;
+        if (empty($lessonId)) {
+            if ($request->filled('lesson_name')) {
+                // التأكد من عدم تكرار اسم الدرس أيضاً
+                $existingLesson = \DB::table('lessons')
+                                    ->where('section_id', $request->class_id)
+                                    ->where('title', $request->lesson_name)
+                                    ->first();
+                
+                if ($existingLesson) {
+                    $lessonId = $existingLesson->id;
+                } else {
+                    $lessonId = \DB::table('lessons')->insertGetId([
+                        'subject_id' => $request->subject_id,
+                        'section_id' => $request->class_id,
+                        'title' => $request->lesson_name,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            } else {
+                return back()->withErrors(['lesson_id' => 'يرجى اختيار درس أو إنشاء درس جديد.'])->withInput();
+            }
+        }
+
+        // 3. حفظ السؤال (بعد التأكد من عدم تكراره)
+        \DB::table('questions')->insert([
+            'lesson_id' => $lessonId,
+            'subject_id' => $request->subject_id,
+            'section_id' => $request->class_id,
             'content' => $request->content,
             'type' => $request->type,
-            'options' => $options,
             'correct_answer' => $request->correct_answer,
-            'feedback' => $request->feedback
+            'options' => $request->type == 'multiple_choice' ? json_encode($request->options) : null,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
-        return back()->with('success', 'تم إضافة السؤال بنجاح');
+        return redirect()->route('teacher.questions.create', [
+            'subject_id' => $request->subject_id, 
+            'class_id' => $request->class_id
+        ])->with('success', 'تم حفظ السؤال وإضافته للبنك بنجاح.');
+    }
+    public function destroyQuestion($id)
+    {
+        // حذف السؤال من قاعدة البيانات
+        \DB::table('questions')->where('id', $id)->delete();
+
+        return back()->with('success', 'تم حذف السؤال من بنك الأسئلة بنجاح.');
     }
 
     // 2. التقييمات
@@ -237,19 +426,6 @@ class TeacherController extends Controller
             }])->get();
 
         return view('teacher.assessments.monitor', compact('subject', 'class', 'assessment', 'students'));
-    }
-
-    public function storeGrades(Request $request, $subject_id, $class_id, $assessment_id) {
-        foreach($request->grades as $student_id => $score) {
-            if($score !== null) {
-                AssessmentMark::updateOrCreate(
-                    ['assessment_id' => $assessment_id, 'student_id' => $student_id],
-                    ['score' => $score]
-                );
-            }
-        }
-        return redirect()->route('teacher.assessments.index', ['subject_id' => $subject_id, 'class_id' => $class_id])
-                         ->with('success', 'تم حفظ الدرجات');
     }
     
     // 4. التقارير
@@ -355,33 +531,27 @@ class TeacherController extends Controller
         return view('teacher.questions.edit', compact('question'));
     }
 
-    public function updateQuestion(Request $request, $id)
+    public function updateQuestion(\Illuminate\Http\Request $request, $id)
     {
-        $question = \App\Models\Question::findOrFail($id);
-
         $request->validate([
             'content' => 'required|string',
-            'correct_answer' => 'required',
+            'type' => 'required|in:true_false,multiple_choice',
+            'correct_answer' => 'required|string',
         ]);
 
-        $data = [
-            'content' => $request->content,
-            'correct_answer' => $request->correct_answer,
-            'feedback' => $request->feedback
-        ];
+        // تحديث البيانات
+        \DB::table('questions')
+            ->where('id', $id)
+            ->update([
+                'content' => $request->content,
+                'type' => $request->type,
+                'correct_answer' => $request->correct_answer,
+                // إذا كان "اختيارات" نأخذ المصفوفة ونحولها لنص، وإلا نضع null
+                'options' => $request->type == 'multiple_choice' ? json_encode($request->options) : null,
+                'updated_at' => now(),
+            ]);
 
-        // تحديث الخيارات فقط إذا كان السؤال "اختيار من متعدد"
-        if ($question->type == 'multiple_choice' && $request->has('options')) {
-            $options = array_filter($request->options, function($value) {
-                return !is_null($value) && $value !== '';
-            });
-            $data['options'] = array_values($options);
-        }
-
-        $question->update($data);
-
-        return redirect()->route('teacher.subject.show', ['subject_id' => $question->lesson->subject_id, 'class_id' => 1]) // تعديل الرابط حسب الحاجة
-                         ->with('success', 'تم تعديل السؤال بنجاح');
+        return back()->with('success', 'تم تعديل السؤال بنجاح.');
     }
     public function storeLesson(Request $request)
     {
@@ -418,7 +588,232 @@ class TeacherController extends Controller
             'subject', 'class', 'assessments', 'marks', 'lessons', 'quizAttempts'
         ));
     }
-    // 1. عرض الصفحة
+
+    // ==========================================
+    //  إدارة الاختبارات التجريبية (Quizzes)
+    // ==========================================
+
+    public function indexQuizzes($subject_id, $section_id)
+    {
+        // 1. جلب بيانات المادة والشعبة
+        $subject = \DB::table('subjects')->where('id', $subject_id)->first();
+        $section = \DB::table('classes')->where('id', $section_id)->first();
+
+        // 2. جلب الاختبارات المرتبطة بهذه المادة والشعبة
+        // نفترض وجود جدول quizzes
+        $quizzes = \DB::table('quizzes')
+                    ->where('subject_id', $subject_id)
+                    ->where('section_id', $section_id)
+                    ->orderByDesc('created_at')
+                    ->get();
+
+        // إضافة عدد الأسئلة لكل اختبار (اختياري)
+        foreach ($quizzes as $quiz) {
+            $quiz->questions_count = \DB::table('questions')
+                                    ->where('quiz_id', $quiz->id)
+                                    ->count();
+        }
+
+        return view('teacher.quizzes.index', compact('subject', 'section', 'quizzes'));
+    }
+
+    public function createQuiz($subject_id, $section_id)
+    {
+        $subject = \DB::table('subjects')->where('id', $subject_id)->first();
+        $section = \DB::table('classes')->where('id', $section_id)->first();
+
+        $lessons = \DB::table('lessons')
+                    ->where('subject_id', $subject_id)
+                    ->where('section_id', $section_id)
+                    ->get();
+
+        // ✅ التعديل هنا: نحسب فقط الأسئلة التي quiz_id تبعها NULL (المتاحة في البنك)
+        foreach ($lessons as $lesson) {
+            $lesson->questions_count = \DB::table('questions')
+                                        ->where('lesson_id', $lesson->id)
+                                        ->whereNull('quiz_id') // <--- الشرط المهم
+                                        ->count();
+        }
+
+        // حساب الأسئلة العامة (المتاحة)
+        $generalQuestionsCount = \DB::table('questions')
+                                ->where('subject_id', $subject_id)
+                                ->where('section_id', $section_id)
+                                ->whereNull('lesson_id')
+                                ->whereNull('quiz_id') // <--- شرط مهم أيضاً
+                                ->count();
+
+        return view('teacher.quizzes.create', compact('subject', 'section', 'lessons', 'generalQuestionsCount'));
+    }
+
+    public function storeQuiz(\Illuminate\Http\Request $request)
+    {
+        // 1. التحقق من المدخلات
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'duration' => 'required|integer|min:1',
+            'questions_count' => 'nullable|integer|min:1', // عدد الأسئلة المطلوب
+        ]);
+
+        // 2. إنشاء الاختبار (Quiz)
+        $quizId = \DB::table('quizzes')->insertGetId([
+            'title' => $request->title,
+            'description' => $request->description,
+            'subject_id' => $request->subject_id,
+            'section_id' => $request->section_id,
+            'duration' => $request->duration,
+            'is_active' => 1, // ✅ تفعيل مباشر (إرسال فوري للطلاب)
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // 3. ⚡ السحر: التوليد التلقائي للأسئلة
+        // إذا اختار المعلم التوليد التلقائي وحدد عدداً للأسئلة
+        if ($request->has('auto_generate') && $request->filled('questions_count')) {
+            
+            // نبدأ الاستعلام
+            $query = \DB::table('questions')
+                ->where('subject_id', $request->subject_id)
+                ->where('section_id', $request->section_id) // تأكيد إضافي على الشعبة
+                ->whereNull('quiz_id'); //  هذا الشرط يضمن أخذ أسئلة البنك فقط
+
+            // ✅ التعديل هنا: إذا اختار المعلم درساً محدداً، نفلتر به
+            if ($request->filled('lesson_id')) {
+                if ($request->lesson_id == 'general') {
+                    // إذا اختار "أسئلة عامة" (نبحث عن lesson_id = NULL)
+                    $query->whereNull('lesson_id');
+                } else {
+                    // إذا اختار درساً محدداً
+                    $query->where('lesson_id', $request->lesson_id);
+                }
+            }
+
+            // إكمال الاستعلام (عشوائي + العدد المطلوب)
+            $randomQuestions = $query->inRandomOrder()
+                ->limit($request->questions_count)
+                ->get();
+
+            // التحقق: هل يوجد أسئلة كافية؟
+            if ($randomQuestions->count() < $request->questions_count) {
+                // حذف الاختبار الفارغ
+                \DB::table('quizzes')->where('id', $quizId)->delete();
+                
+                // رسالة خطأ ذكية
+                $msg = $request->filled('lesson_id') 
+                    ? 'لا يوجد عدد كافٍ من الأسئلة في هذا الدرس تحديداً!' 
+                    : 'بنك الأسئلة لا يحتوي على عدد كافٍ!';
+                    
+                return back()->with('error', $msg . ' (المتوفر: ' . $randomQuestions->count() . ')');
+            }
+
+            // نسخ الأسئلة (نفس الكود السابق)...
+            foreach ($randomQuestions as $q) {
+                \DB::table('questions')->insert([
+                    'quiz_id' => $quizId,
+                    'subject_id' => $q->subject_id,
+                    'section_id' => $q->section_id,
+                    'lesson_id' => $q->lesson_id,
+                    'content' => $q->content,
+                    'type' => $q->type,
+                    'options' => $q->options,
+                    'correct_answer' => $q->correct_answer,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
+
+        return redirect()->route('teacher.quizzes.index', [
+            'subject_id' => $request->subject_id, 
+            'section_id' => $request->section_id
+        ])->with('success', 'تم إنشاء الاختبار وإرساله للطلاب بنجاح! 🚀');
+    }
+
+    public function deleteQuiz($id)
+    {
+        // حذف الأسئلة المرتبطة أولاً
+        \DB::table('questions')->where('quiz_id', $id)->delete();
+        
+        // حذف الاختبار
+        \DB::table('quizzes')->where('id', $id)->delete();
+
+        return back()->with('success', 'تم حذف الاختبار بنجاح.');
+    }
+
+    public function quizResults($id)
+    {
+        // هذه الدالة لعرض النتائج (Placeholder)
+        return back()->with('error', 'صفحة النتائج قيد التطوير حالياً.');
+    }
+    public function showQuiz($id)
+    {
+        // جلب الاختبار مع المادة والشعبة
+        $quiz = \DB::table('quizzes')
+                ->join('subjects', 'quizzes.subject_id', '=', 'subjects.id')
+                ->join('classes', 'quizzes.section_id', '=', 'classes.id') // أو section_id حسب الجدول
+                ->where('quizzes.id', $id)
+                ->select('quizzes.*', 'subjects.name as subject_name', 'classes.section as section_name')
+                ->first();
+
+        if (!$quiz) {
+            return back()->with('error', 'الاختبار غير موجود.');
+        }
+
+        // جلب الأسئلة المرتبطة بهذا الاختبار
+        $questions = \DB::table('questions')
+                    ->where('quiz_id', $id)
+                    ->get();
+
+        return view('teacher.quizzes.show', compact('quiz', 'questions'));
+    }
+    public function quizReport($id)
+    {
+        $quiz = \DB::table('quizzes')
+                ->join('subjects', 'quizzes.subject_id', '=', 'subjects.id')
+                ->join('classes', 'quizzes.section_id', '=', 'classes.id')
+                ->where('quizzes.id', $id)
+                ->select('quizzes.*', 'subjects.name as subject_name', 'classes.section as section_name')
+                ->first();
+
+        if (!$quiz) { return abort(404); }
+
+        $questions = \DB::table('questions')->where('quiz_id', $id)->get();
+
+        // نستخدم view مستقلة تماماً بدون Layout المعلم المعتاد
+        return view('teacher.quizzes.report', compact('quiz', 'questions'));
+    }
+    public function showQuizResults($quiz_id)
+    {
+        $quiz = DB::table('quizzes')->where('id', $quiz_id)->first();
+        
+        if (!$quiz) {
+            return redirect()->back()->with('error', 'الاختبار غير موجود');
+        }
+
+        $results = DB::table('student_results')
+            ->leftJoin('users', 'student_results.student_id', '=', 'users.id')
+            ->where('student_results.quiz_id', $quiz_id)
+            ->select('student_results.*', 'users.name as student_name')
+            ->get();
+
+        return view('teacher.quizzes.results', compact('quiz', 'results'));
+    }
+    public function printQuizResults($id)
+    {
+        $quiz = DB::table('quizzes')->where('id', $id)->first();
+        
+        if (!$quiz) { return abort(404); }
+
+        $results = DB::table('student_results')
+            ->leftJoin('users', 'student_results.student_id', '=', 'users.id')
+            ->where('student_results.quiz_id', $id)
+            ->select('student_results.*', 'users.name as student_name')
+            ->orderBy('score', 'desc')
+            ->get();
+
+        return view('teacher.quizzes.print_results', compact('quiz', 'results'));
+    }
+        // 1. عرض الصفحة
 public function showSchedule($subject_id, $class_id)
 {
     $subject = \App\Models\Subject::findOrFail($subject_id);

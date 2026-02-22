@@ -1,160 +1,187 @@
 @extends('layouts.student')
+
 @section('content')
 
-<div class="container py-5">
-    
-    {{-- هيدر الصفحة --}}
-    <div class="d-flex justify-content-between align-items-center mb-5">
+@php
+    $totalUpcomingExams = $subjects->sum(function($subject) {
+        return $subject->upcoming_exams->count();
+    });
+@endphp
+
+{{-- 1. الترويسة (نفس ستايل المدير) --}}
+<div class="card page-header-card mb-4 shadow border-0">
+    <div class="card-body d-flex justify-content-between align-items-center">
         <div>
-            <h2 class="fw-bold text-dark">لوحة الطالب 🎓</h2>
-            <p class="text-muted">أهلاً بك، <b>{{ $user->name }}</b> | فصل: {{ $class->grade?->name ?? 'غير محدد' }} - {{ $class->section }}</p>
+            <h2 class="fw-bold mb-1 text-white">لوحة التحكم 🎓</h2>
+            <p class="text-white-50 mb-0">أهلاً بك يا {{ Auth::user()->name }} 👋. نتمنى لك فصلاً دراسياً موفقاً.</p>
         </div>
-        <div class="bg-white p-3 rounded-circle shadow-sm text-primary">
-            <i class="fas fa-user-graduate fa-2x"></i>
+        <div class="d-none d-md-block">
+            <i class="fas fa-user-graduate fa-4x text-primary opacity-25"></i>
         </div>
-    </div>
-
-    {{-- شبكة المواد --}}
-    <div class="row">
-        @forelse($subjects as $subject)
-        <div class="col-md-6 col-lg-4 mb-4">
-            {{-- كرت المادة --}}
-            <div class="card h-100 border-0 shadow-sm hover-card overflow-hidden">
-                <div class="card-body p-4 position-relative">
-                    {{-- زخرفة خلفية --}}
-                    <i class="fas fa-book position-absolute opacity-10" style="font-size: 8rem; right: -20px; bottom: -20px; color: var(--bs-primary);"></i>
-                    
-                    <h5 class="fw-bold text-dark mb-1">{{ $subject->name }}</h5>
-                    <p class="text-muted small mb-4"><i class="fas fa-chalkboard-teacher me-1"></i> {{ $subject->teacher_name }}</p>
-
-                    <div class="d-flex justify-content-between align-items-end mt-3">
-                        <div>
-                            {{-- عرض سريع لعدد الامتحانات القادمة --}}
-                            @if($subject->upcoming_exams->count() > 0)
-                                <span class="badge bg-warning text-dark mb-2">
-                                    <i class="fas fa-clock me-1"></i> {{ $subject->upcoming_exams->count() }} امتحان قادم
-                                </span>
-                            @else
-                                <span class="badge bg-light text-muted mb-2">لا توجد امتحانات</span>
-                            @endif
-                        </div>
-                        
-                        {{-- زر التفاصيل --}}
-                        <button class="btn btn-primary rounded-pill px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#subjectModal{{ $subject->id }}">
-                            التفاصيل <i class="fas fa-arrow-left ms-1"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {{-- ============================== --}}
-            {{-- نافذة التفاصيل (MODAL) --}}
-            {{-- ============================== --}}
-            <div class="modal fade" id="subjectModal{{ $subject->id }}" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered modal-lg">
-                    <div class="modal-content border-0 shadow">
-                        <div class="modal-header bg-primary text-white">
-                            <h5 class="modal-title fw-bold">
-                                <i class="fas fa-book-open me-2"></i> {{ $subject->name }}
-                            </h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body p-4 bg-light">
-                            <div class="row g-4">
-                                
-                                {{-- العمود الأيمن: الدرجات --}}
-                                <div class="col-md-6">
-                                    <div class="bg-white p-3 rounded shadow-sm h-100">
-                                        <h6 class="fw-bold text-success border-bottom pb-2 mb-3">
-                                            <i class="fas fa-chart-line me-2"></i> درجاتي وسجل العلامات
-                                        </h6>
-                                        @if($subject->my_grades->count() > 0)
-                                            <div class="table-responsive">
-                                                <table class="table table-sm table-hover mb-0">
-                                                    <thead class="table-light">
-                                                        <tr>
-                                                            <th>الامتحان</th>
-                                                            <th class="text-center">الدرجة</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        @foreach($subject->my_grades as $grade)
-                                                        <tr>
-                                                            <td>{{ $grade->title }}</td>
-                                                            <td class="text-center">
-                                                                <span class="fw-bold {{ $grade->score >= ($grade->max_score/2) ? 'text-success' : 'text-danger' }}">
-                                                                    {{ $grade->score }} / {{ $grade->max_score }}
-                                                                </span>
-                                                            </td>
-                                                        </tr>
-                                                        @endforeach
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        @else
-                                            <div class="text-center text-muted py-4">
-                                                <i class="fas fa-clipboard me-1"></i> لا توجد درجات مرصودة بعد.
-                                            </div>
-                                        @endif
-                                    </div>
-                                </div>
-
-                                {{-- العمود الأيسر: المواعيد --}}
-                                <div class="col-md-6">
-                                    <div class="bg-white p-3 rounded shadow-sm h-100">
-                                        <h6 class="fw-bold text-warning text-dark border-bottom pb-2 mb-3">
-                                            <i class="fas fa-calendar-alt me-2"></i> الامتحانات القادمة
-                                        </h6>
-                                        @if($subject->upcoming_exams->count() > 0)
-                                            <ul class="list-group list-group-flush">
-                                                @foreach($subject->upcoming_exams as $exam)
-                                                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                                                    <div>
-                                                        <span class="fw-bold d-block text-dark">{{ $exam->title }}</span>
-                                                        <small class="text-muted">{{ \Carbon\Carbon::parse($exam->exam_date)->locale('ar')->diffForHumans() }}</small>
-                                                    </div>
-                                                    <span class="badge bg-warning text-dark rounded-pill">
-                                                        {{ \Carbon\Carbon::parse($exam->exam_date)->format('Y-m-d') }}
-                                                    </span>
-                                                </li>
-                                                @endforeach
-                                            </ul>
-                                        @else
-                                            <div class="text-center text-muted py-4">
-                                                <i class="fas fa-coffee me-1"></i> استراحة! لا توجد امتحانات قريبة.
-                                            </div>
-                                        @endif
-                                    </div>
-                                </div>
-
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {{-- نهاية الـ Modal --}}
-
-        </div>
-        @empty
-        <div class="col-12 text-center">
-            <div class="alert alert-info">لا توجد مواد دراسية لعرضها حالياً.</div>
-        </div>
-        @endforelse
     </div>
 </div>
 
-{{-- CSS بسيط للأنيميشن --}}
-<style>
-    .hover-card {
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-    .hover-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
-    }
-    .modal-content {
-        overflow: hidden;
-    }
-</style>
+{{-- 2. كروت الإحصائيات العلوية (4 كروت بنفس تنسيق الإدارة) --}}
+<div class="row g-4 mb-4">
+    
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100 py-2 border-start border-4 border-primary">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs fw-bold text-primary text-uppercase mb-1">المواد الدراسية</div>
+                        <div class="h3 mb-0 fw-bold text-dark">{{ $subjects->count() }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-book-open fa-2x text-gray-300 text-primary opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100 py-2 border-start border-4 border-warning">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs fw-bold text-warning text-uppercase mb-1">الامتحانات القادمة</div>
+                        <div class="h3 mb-0 fw-bold text-dark">{{ $totalUpcomingExams }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-calendar-alt fa-2x text-gray-300 text-warning opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100 py-2 border-start border-4 border-info">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs fw-bold text-info text-uppercase mb-1">الفصل الدراسي</div>
+                        <div class="h5 mb-0 fw-bold text-dark mt-2">{{ $class ? $class->name : 'غير مسكن' }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-chalkboard fa-2x text-gray-300 text-info opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- 4. كرت الاختبارات التجريبية --}}
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100 py-2 border-start border-4 border-success">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs fw-bold text-success text-uppercase mb-1">اختبارات تجريبية</div>
+                        <div class="h6 mb-0 fw-bold text-dark mt-2">من الأستاذ</div>
+                    </div>
+                    <div class="col-auto">
+                        {{-- حطينا علامة # مؤقتاً لين نبرمجو صفحة الاختبارات --}}
+                        <a href="#" class="text-decoration-none">
+                            <i class="fas fa-file-signature fa-2x text-gray-300 text-success opacity-25"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{{-- 3. القسم السفلي (الإجراءات، المواد، والتنبيهات) --}}
+<div class="row">
+    <div class="col-lg-8">
+        {{-- كرت الإجراءات السريعة (مربع الأزرار الثلاثة) --}}
+        <div class="card shadow border-0 mb-4">
+            <div class="card-header bg-white py-3 border-bottom-0">
+                <h6 class="m-0 fw-bold text-secondary"><i class="fas fa-bolt text-warning me-2"></i> إجراءات سريعة</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex gap-3 flex-wrap">
+                    
+                    <a href="{{ route('student.report_card') }}" class="btn btn-outline-primary btn-lg flex-grow-1 shadow-sm py-3">
+                        <i class="fas fa-file-invoice mb-2 d-block fs-3"></i>
+                        كشف الدرجات
+                    </a>
+
+                    <a href="#" class="btn btn-outline-success btn-lg flex-grow-1 shadow-sm py-3">
+                        <i class="fas fa-calendar-week mb-2 d-block fs-3"></i>
+                        الجدول الدراسي
+                    </a>
+
+                    <a href="{{ route('messages.index') }}" class="btn btn-outline-info btn-lg flex-grow-1 shadow-sm py-3">
+                        <i class="fas fa-chalkboard-teacher mb-2 d-block fs-3"></i>
+                        تواصل مع المعلمين
+                    </a>
+                    
+                </div>
+            </div>
+        </div>
+
+        {{-- قائمة المواد --}}
+        <div class="card shadow border-0 mb-4">
+            <div class="card-header bg-white py-3 border-bottom-0">
+                <h6 class="m-0 fw-bold text-secondary"><i class="fas fa-book-open text-primary me-2"></i> مقرراتي الدراسية</h6>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    @forelse($subjects as $subject)
+                        <li class="list-group-item d-flex justify-content-between align-items-center p-3">
+                            <div>
+                                <h6 class="fw-bold mb-1 text-dark">{{ $subject->name }}</h6>
+                                <small class="text-muted"><i class="fas fa-user-tie me-1"></i> المعلم: {{ $subject->teacher_name }}</small>
+                            </div>
+                            <span class="badge bg-light text-primary border rounded-pill px-3 py-2">
+                                <i class="fas fa-star me-1 text-warning"></i> {{ $subject->my_grades->count() }} درجات مسجلة
+                            </span>
+                        </li>
+                    @empty
+                        <li class="list-group-item text-center py-4 text-muted">لا توجد مواد مسجلة حالياً.</li>
+                    @endforelse
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    {{-- 4. كرت الامتحانات (بديل لكود "حالة النظام" في صفحة الإدارة) --}}
+    <div class="col-lg-4">
+        <div class="card shadow border-0 mb-4 h-100">
+            <div class="card-header bg-white py-3 border-bottom-0">
+                <h6 class="m-0 fw-bold text-secondary">📅 الامتحانات القادمة</h6>
+            </div>
+            <div class="card-body py-4">
+                @if($totalUpcomingExams > 0)
+                    <div class="timeline">
+                        @foreach($subjects as $subject)
+                            @foreach($subject->upcoming_exams as $exam)
+                                <div class="d-flex align-items-start mb-3 pb-3 border-bottom">
+                                    <div class="icon-circle bg-light text-danger me-3" style="width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #ffe5e5;">
+                                        <span class="fw-bold">{{ \Carbon\Carbon::parse($exam->exam_date)->format('d') }}</span>
+                                    </div>
+                                    <div>
+                                        <h6 class="fw-bold mb-1 text-dark">{{ $subject->name }}</h6>
+                                        <small class="text-muted"><i class="fas fa-clock me-1"></i> {{ $exam->title ?? 'امتحان' }} - {{ \Carbon\Carbon::parse($exam->exam_date)->translatedFormat('l') }}</small>
+                                    </div>
+                                </div>
+                            @endforeach
+                        @endforeach
+                    </div>
+                @else
+                    <div class="text-center d-flex flex-column justify-content-center h-100 pb-5">
+                        <i class="fas fa-check-circle fa-4x text-success opacity-25 mb-3"></i>
+                        <h6 class="fw-bold text-dark">لا توجد امتحانات قريبة</h6>
+                        <p class="text-muted small">راجع دروسك بانتظام وكن مستعداً.</p>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+</div>
 
 @endsection

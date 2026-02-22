@@ -60,7 +60,6 @@ class StudentController extends Controller
             // ب) جلب الامتحانات القادمة (من جدول exams)
             // نتأكد أنها لنفس المادة ولنفس الفصل
             $subject->upcoming_exams = \App\Models\Exam::where('subject_id', $subject->id)
-                                        ->where('class_id', $class->id)
                                         ->whereDate('exam_date', '>=', now())
                                         ->orderBy('exam_date')
                                         ->get(); // get() تعيد Collection دائماً ولا تعيد null
@@ -129,6 +128,56 @@ class StudentController extends Controller
                     });
 
         return view('student.grades', compact('marks'));
+    }
+
+    public function reportCard()
+    {
+        $user = auth()->user();
+        $studentProfile = \App\Models\StudentProfile::where('user_id', $user->id)->first();
+        
+        // التأكد من أن الطالب مسجل في فصل
+        if (!$studentProfile || !$studentProfile->class_id) {
+            return redirect()->back()->with('error', 'عذراً، يجب أن تكون مسجلاً في فصل دراسي لعرض كشف الدرجات.');
+        }
+
+        $class = \App\Models\SchoolClass::find($studentProfile->class_id);
+        $subjects = \App\Models\Subject::where('grade_id', $class->grade_id)->get();
+
+        $reportData = [];
+        $totalStudentScore = 0;
+        $totalMaxScore = 0;
+
+        foreach ($subjects as $subject) {
+            // 1. جلب توزيع الدرجات المعتمد لهذه المادة (من الدالة اللي صممناها)
+            $distribution = $subject->getGradeDistribution(); 
+            
+            // 2. جلب مجموع درجات الطالب في هذه المادة من جدول (marks)
+            // ملاحظة: استبدل 'score' باسم العمود الصحيح للدرجة عندك إذا كان مختلفاً
+            $studentTotal = \App\Models\Mark::where('user_id', $user->id)
+                                            ->where('subject_id', $subject->id)
+                                            ->sum('score'); 
+
+            // 3. تحديد حالة الطالب (ناجح لو جاب 50% أو أكثر من المجموع)
+            $isPassed = $studentTotal >= ($distribution['total'] / 2);
+
+            $reportData[] = [
+                'name'          => $subject->name,
+                'max_works'     => $distribution['works'],
+                'max_final'     => $distribution['final'],
+                'max_total'     => $distribution['total'],
+                'student_total' => $studentTotal,
+                'status'        => $isPassed ? 'ناجح' : 'دون المستوى',
+                'status_color'  => $isPassed ? 'success' : 'danger',
+            ];
+
+            $totalStudentScore += $studentTotal;
+            $totalMaxScore += $distribution['total'];
+        }
+
+        // حساب النسبة المئوية العامة للطالب
+        $percentage = $totalMaxScore > 0 ? round(($totalStudentScore / $totalMaxScore) * 100, 2) : 0;
+
+        return view('student.report_card', compact('user', 'class', 'reportData', 'totalStudentScore', 'totalMaxScore', 'percentage'));
     }
 
     // --- الدوال القديمة للحفاظ على عمل باقي النظام ---

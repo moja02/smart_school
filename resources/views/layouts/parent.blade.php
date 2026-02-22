@@ -26,8 +26,9 @@
             <i class="fas fa-home"></i> الرئيسية (الأبناء)
         </a>
 
-        <a href="{{ route('parent.profile') }}" class="{{ request()->routeIs('parent.profile') ? 'active' : '' }}">
-            <i class="fas fa-user-cog"></i> إعدادات الحساب
+        <a class="dropdown-item" href="{{ route('profile.edit') }}">
+            <i class="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i>
+            الملف الشخصي
         </a>
 
         <a href="{{ route('parent.attendance') }}" class="{{ request()->routeIs('parent.attendance') ? 'active' : '' }}">

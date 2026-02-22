@@ -25,6 +25,11 @@
         <a href="{{ route('teacher.dashboard') }}" class="{{ request()->routeIs('teacher.dashboard') ? 'active' : '' }}">
             <i class="fas fa-home"></i> الرئيسية
         </a>
+
+        <a class="dropdown-item" href="{{ route('profile.edit') }}">
+            <i class="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i>
+            الملف الشخصي
+        </a>
         
         <a href="{{ route('teacher.classes') }}" class="{{ request()->routeIs('teacher.classes*') ? 'active' : '' }}">
             <i class="fas fa-chalkboard"></i> فصولي الدراسية

@@ -12,6 +12,9 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\userController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ManagerController;
+use App\Http\Controllers\AssessmentController;
+use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\ScheduleController;
 
 // ====================================================
 // 1. المصادقة والصفحة الرئيسية
@@ -38,21 +41,27 @@ Route::get('/home', [userController::class, 'index'])->name('home');
 // 2. راوتات محمية (تتطلب تسجيل دخول)
 // ====================================================
 Route::middleware(['auth'])->group(function () {
-
+    // روابط الملف الشخصي الموحدة
+    Route::get('/profile', [App\Http\Controllers\ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profile', [App\Http\Controllers\ProfileController::class, 'update'])->name('profile.update');
     // ==========================================
     // 👔 روابط مدير المدرسة (School Manager)
     // ==========================================
-    Route::middleware(['is_manager'])->prefix('manager')->name('manager.')->group(function () {
+    Route::middleware(['is_manager'])->group(function () {
         
-        // 1. لوحة تحكم المدير
-        Route::get('/dashboard', [ManagerController::class, 'dashboard'])->name('dashboard');
+    // 1. لوحة تحكم المدير
+    Route::get('/manager/dashboard', [ManagerController::class, 'dashboard'])->name('manager.dashboard');
 
-        // 2. صلاحية تعيين مسؤول الدراسة
-        Route::get('/create-admin', [AdminController::class, 'createStudyOfficer'])->name('create_admin');
-        Route::post('/store-admin', [AdminController::class, 'storeStudyOfficer'])->name('store_admin');
+    // 2. صلاحية تعيين مسؤول الدراسة
+    Route::get('/manager/create-admin', [ManagerController::class, 'createStudyOfficer'])->name('manager.create_admin');
+    Route::post('/manager/store-admin', [AdminController::class, 'storeStudyOfficer'])->name('manager.store_admin');
 
-        // 3. صفحات العرض
-        Route::get('/teachers', [ManagerController::class, 'listTeachers'])->name('teachers.index');
+    // 3. صفحات العرض
+    Route::get('/manager/teachers', [ManagerController::class, 'listTeachers'])->name('manager.teachers.index');
+
+    // سجل مراقبة النظام (System Logs)
+    Route::get('/manager/system-logs', [ManagerController::class, 'systemLogs'])->name('manager.system_logs');
+    
     });
     // التوجيه العام للوحة التحكم
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -117,7 +126,7 @@ Route::middleware(['auth'])->group(function () {
         // مسار إلغاء إسناد مادة لمدرس من شعبة معينة
         Route::delete('/admin/assign/remove/{section_id}', [AdminController::class, 'removeAssignment'])->name('admin.assign.remove');
         // مسار تحديث أستاذ المادة لشعبة معينة
-        Route::put('/admin/assign/update', [AdminController::class, 'updateAssignment'])->name('admin.assign.update');
+Route::put('/admin/assign/update', [AdminController::class, 'updateAssignment'])->name('admin.assign.update');
         Route::get('/admin/assign', [AdminController::class, 'createAssignment'])->name('admin.assign');
         Route::post('/admin/assign', [AdminController::class, 'storeAssignment'])->name('admin.storeAssign');
         // ✅ مسار AJAX لجلب المواد المتاحة حسب الفصل (مهم جداً للتوزيع)
@@ -137,14 +146,16 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/admin/parents/link/{id}', [AdminController::class, 'deleteParentLink'])->name('admin.parents.deleteLink');
 
         // 7. الجداول الدراسية
-        // ✅ هذا هو السطر الذي تم إصلاحه هنا (تغيير listSchedules إلى showSchedules)
-        Route::get('/admin/schedule', [AdminController::class, 'showSchedules'])->name('admin.schedule.index');
+        Route::get('/admin/schedule', [AdminController::class, 'listSchedules'])->name('admin.schedule.index');
 
         // 8. التقارير
         Route::get('/admin/reports', [AdminController::class, 'showReports'])->name('admin.reports.index');
         // مسار طباعة تقرير الأوائل (صفحة مستقلة)
         Route::get('/admin/reports/print', [AdminController::class, 'printReport'])->name('admin.reports.print');
         Route::get('/admin/reports/certificate/{student_id}', [AdminController::class, 'printCertificate'])->name('admin.reports.print_certificate');
+
+        //9. تشغيل او ايقاف الرصد
+        Route::post('/grading/toggle', [AdminController::class, 'toggleGrading'])->name('admin.grading.toggle');
     });
 
     // ====================================================
@@ -162,37 +173,69 @@ Route::middleware(['auth'])->group(function () {
 
         // إدارة المادة التعليمية
         Route::get('/subject/{subject_id}/class/{class_id}', [TeacherController::class, 'showSubject'])->name('teacher.subject.show');
-
-        // الامتحانات والتقويم
-        Route::get('/subject/{subject_id}/class/{class_id}/schedule', [TeacherController::class, 'showSchedule'])->name('teacher.schedule.index');
-        Route::post('/schedule/store', [TeacherController::class, 'storeExam'])->name('teacher.schedule.store');
-        Route::get('/subject/{subject_id}/class/{class_id}/schedule/events', [TeacherController::class, 'getExamsEvents'])->name('teacher.schedule.events');
-        Route::post('/schedule/update', [TeacherController::class, 'updateExam'])->name('teacher.schedule.update');
-        Route::post('/schedule/delete', [TeacherController::class, 'deleteExam'])->name('teacher.schedule.delete');
+        Route::get('/teacher/class/{subject_id}/{class_id}', [TeacherController::class, 'showClass'])->name('teacher.class.show');
 
         // الأسئلة والتقييمات
         Route::get('/subject/{subject_id}/class/{class_id}/questions/create', [TeacherController::class, 'createQuestion'])->name('teacher.questions.create');
         Route::post('/subject/{subject_id}/class/{class_id}/questions', [TeacherController::class, 'storeQuestion'])->name('teacher.questions.store');
+        // صفحة رصد درجات تقييم معين
+        Route::get('/teacher/assessments/{assessment_id}/marks', [AssessmentController::class, 'editMarks'])->name('teacher.assessments.marks');
         
-        Route::get('/subject/{subject_id}/class/{class_id}/assessments', [TeacherController::class, 'createAssessment'])->name('teacher.assessments.index');
-        Route::post('/subject/{subject_id}/class/{class_id}/assessments', [TeacherController::class, 'storeAssessment'])->name('teacher.assessments.store');
+        // صفحة عرض التقييمات الحالية للفصل
+        Route::get('/teacher/assessments/{subject_id}/{section_id}', [AssessmentController::class, 'index'])->name('teacher.assessments.index');
 
-        // رصد الدرجات
-        Route::get('/subject/{subject_id}/class/{class_id}/assessment/{assessment_id}', [TeacherController::class, 'monitorGrades'])->name('teacher.assessments.monitor');
-        Route::post('/subject/{subject_id}/class/{class_id}/assessment/{assessment_id}', [TeacherController::class, 'storeGrades'])->name('teacher.assessments.store_grades');
-        // (روابط قديمة للدرجات - يمكن الاحتفاظ بها للتوافق)
-        Route::get('/grade/create/{student_id}', [TeacherController::class, 'createGrade'])->name('teacher.createGrade');
-        Route::post('/grade/store/{student_id}', [TeacherController::class, 'storeGrade'])->name('teacher.storeGrade');
+        // حفظ تقييم جديد (مع التحقق من الحد الأقصى)
+        Route::post('/teacher/assessments/store', [AssessmentController::class, 'store'])->name('teacher.assessments.store');
+
+
+        // حفظ درجات الطلاب وتحديث المجموع الكلي
+        Route::post('/teacher/assessments/save-marks', [AssessmentController::class, 'saveMarks'])->name('teacher.assessments.save_marks');
+        // صفحة رصد الامتحان النهائي
+        Route::get('/teacher/final-grades/{subject_id}/{section_id}', [TeacherController::class, 'editFinalGrades'])->name('teacher.final_grades.edit');
+
+        // حفظ درجات النهائي
+        Route::post('/teacher/final-grades/store', [TeacherController::class, 'storeFinalGrades'])->name('teacher.final_grades.store');
+        
+        // ✅ صفحة عرض كشف رصد الدرجات
+        Route::get('/teacher/grades/{subject_id}/{section_id}', [TeacherController::class, 'createGrades'])
+        ->name('teacher.grades.create');
+
+        // ✅ رابط حفظ الدرجات عند الضغط على زر الحفظ
+        Route::post('/teacher/grades/store', [TeacherController::class, 'storeGrades'])
+        ->name('teacher.grades.store');
 
         // الغياب
-        Route::get('/class/{id}/attendance', [TeacherController::class, 'attendance'])->name('teacher.attendance');
-        Route::post('/class/{id}/attendance', [TeacherController::class, 'storeAttendance'])->name('teacher.attendance.store');
+        Route::get('/teacher/attendance/{section_id}', [AttendanceController::class, 'index'])->name('teacher.attendance.index');
+        Route::post('/teacher/attendance/store', [AttendanceController::class, 'store'])->name('teacher.attendance.store');
 
-        // الدروس
-        Route::post('/lesson/store', [TeacherController::class, 'storeLesson'])->name('teacher.lessons.store');
-        Route::get('/lesson/{id}/edit', [TeacherController::class, 'editLesson'])->name('teacher.lesson.edit');
-        Route::put('/lesson/{id}', [TeacherController::class, 'updateLesson'])->name('teacher.lesson.update');
+        // إدارة الاختبارات التجريبية (Quizzes)
+        Route::get('/subject/{subject_id}/class/{section_id}/quizzes', [TeacherController::class, 'indexQuizzes'])->name('teacher.quizzes.index');
+        Route::get('/subject/{subject_id}/class/{section_id}/quizzes/create', [TeacherController::class, 'createQuiz'])->name('teacher.quizzes.create');
+        Route::post('/teacher/quizzes/store', [TeacherController::class, 'storeQuiz'])->name('teacher.quizzes.store');
+        Route::get('/teacher/quizzes/{id}/results', [TeacherController::class, 'quizResults'])->name('teacher.quizzes.results');
+        Route::delete('/teacher/quizzes/{id}', [TeacherController::class, 'deleteQuiz'])->name('teacher.quizzes.delete');
+        Route::delete('/teacher/questions/{id}', [TeacherController::class, 'destroyQuestion'])->name('teacher.questions.destroy');
+        Route::get('/teacher/quizzes/{id}', [TeacherController::class, 'showQuiz'])->name('teacher.quizzes.show');
+        Route::put('/teacher/questions/{id}', [TeacherController::class, 'updateQuestion'])->name('teacher.questions.update');
+        Route::get('/teacher/quizzes/{id}/report', [TeacherController::class, 'quizReport'])->name('teacher.quizzes.report');
+        Route::get('/teacher/quizzes/{id}/results', [App\Http\Controllers\TeacherController::class, 'showQuizResults'])->name('teacher.quizzes.results');
+        Route::get('/teacher/quizzes/{id}/print-results', [App\Http\Controllers\TeacherController::class, 'printQuizResults'])->name('teacher.quizzes.print');
+       
+        // صفحة التقويم الرئيسية (تأخذ معرف المادة ومعرف الشعبة)
+        Route::get('/teacher/schedule/{subject_id}/{section_id}', [App\Http\Controllers\ScheduleController::class, 'index'])
+            ->name('teacher.schedule.index');
 
+        Route::get('/teacher/schedule/events/{subject_id}/{section_id}', [App\Http\Controllers\ScheduleController::class, 'getEvents'])
+            ->name('teacher.schedule.events');
+
+        // رابط حفظ امتحان جديد
+        Route::post('/teacher/schedule/store', [App\Http\Controllers\ScheduleController::class, 'store'])->name('teacher.schedule.store');
+
+        // رابط تعديل امتحان موجود
+        Route::post('/teacher/schedule/update', [App\Http\Controllers\ScheduleController::class, 'update'])->name('teacher.schedule.update');
+
+        // رابط حذف امتحان
+        Route::post('/teacher/schedule/delete', [App\Http\Controllers\ScheduleController::class, 'delete'])->name('teacher.schedule.delete');
         // التقارير
         Route::get('/subject/{subject_id}/class/{class_id}/report', [TeacherController::class, 'subjectReport'])->name('teacher.subject.report');
         Route::get('/subject/{subject_id}/class/{class_id}/report/print', [TeacherController::class, 'printReport'])->name('teacher.subject.report.print');
@@ -205,6 +248,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/dashboard', [StudentController::class, 'dashboard'])->name('student.dashboard');
         
         // المواد والدرجات
+        Route::get('/student/report-card', [\App\Http\Controllers\StudentController::class, 'reportCard'])->name('student.report_card');
         Route::get('/my-subjects', [StudentController::class, 'mySubjects'])->name('student.subjects.index');
         Route::get('/subject/{id}', [StudentController::class, 'showSubject'])->name('student.subjects.show');
         Route::get('/my-grades', [StudentController::class, 'myGrades'])->name('student.grades'); // الاسم القديم كان student.grades
@@ -243,34 +287,5 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/messages', [MessageController::class, 'index'])->name('messages.index');
     Route::get('/messages/{userId}', [MessageController::class, 'chat'])->name('messages.chat');
     Route::post('/messages/send', [MessageController::class, 'sendMessage'])->name('messages.send');
-    
-    Route::prefix('schedules')->name('schedules.')->group(function() {
-    // عرض الجداول
-    Route::get('/view', [AdminController::class, 'showSchedules'])->name('view');
-    
-    // قائمة المعلمين للتفضيلات
-    Route::get('/preferences', [AdminController::class, 'preferencesList'])->name('preferences');
-    
-    // تعديل وحفظ التفضيلات
-    Route::get('/preferences/{id}/edit', [AdminController::class, 'editPreference'])->name('preferences.edit');
-    Route::post('/preferences/{id}/store', [AdminController::class, 'storePreference'])->name('preferences.store');
-});
-
-// داخل مجموعة الـ admin
-Route::prefix('schedules')->name('admin.schedules.')->group(function() {
-    // عرض الجداول (index.blade.php)
-    Route::get('/view', [AdminController::class, 'showSchedules'])->name('view');
-    
-    // قائمة المعلمين (Preferences) - سأجعلها توجه لنفس الصفحة أو صفحة القائمة
-    Route::get('/preferences', [AdminController::class, 'preferencesList'])->name('preferences');
-    
-    // تعديل التفضيلات (edit_preference.blade.php)
-    Route::get('/preferences/{id}/edit', [AdminController::class, 'editPreference'])->name('preferences.edit');
-    
-    // حفظ التفضيلات
-    Route::post('/preferences/{id}/store', [AdminController::class, 'storePreference'])->name('preferences.store');
-});
-
-Route::post('/schedules/generate', [AdminController::class, 'generateAutoSchedule'])->name('admin.schedules.generate');
 
 });
