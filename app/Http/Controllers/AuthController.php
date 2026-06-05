@@ -40,11 +40,21 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        if (Auth::attempt($creds, remember: true)) {
+        if (Auth::attempt($creds, $request->has('remember'))) {
+            
+            // 👇 إضافة فحص الحظر هنا (بعد التأكد من صحة البيانات) 👇
+            if (Auth::user()->is_banned) {
+                Auth::logout(); // تسجيل خروج فوري
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+                return back()->withErrors(['email' => 'عذراً، هذا الحساب محظور من قبل الإدارة. يرجى مراجعة المدرسة.']);
+            }
+            // 👆 نهاية كود الحظر 👆
+
             $request->session()->regenerate();
             
-            // ✅ التعديل هنا: استدعاء دالة التوجيه الذكي
-            return $this->redirectByRole(Auth::user()->role);
+            // ✅ التعديل هنا: نمرر كائن المستخدم بالكامل للدالة للتحقق الدقيق
+            return $this->redirectByRole(Auth::user());
         }
 
         return back()->withErrors(['email' => 'بيانات الدخول غير صحيحة.']);
@@ -58,16 +68,30 @@ class AuthController extends Controller
         return redirect()->route('login.form');
     }
 
-    // ✅ دالة التوجيه بناءً على الصلاحية
-    protected function redirectByRole(string $role)
+    // ✅ دالة التوجيه الشاملة (تدعم Spatie والعمود العادي)
+    protected function redirectByRole($user)
     {
-        return match ($role) {
-            'manager' => redirect()->route('manager.dashboard'), // 👔 توجيه المدير للوحته الخاصة
-            'admin'   => redirect()->route('admin.dashboard'),   // 🎓 توجيه الأدمن (مسؤول الدراسة)
-            'student' => redirect()->route('student.dashboard'),
-            'teacher' => redirect()->route('teacher.dashboard'),
-            'parent'  => redirect()->route('parent.dashboard'),
-            default   => redirect()->intended('dashboard'),      // الاحتياطي
-        };
+        if ($user->hasRole('super_admin') || $user->role === 'super_admin') {
+            return redirect()->route('system.schools.index'); // 🌐 توجيه مدير النظام (الجديد)
+        }
+        if ($user->hasRole('manager') || $user->role === 'manager') {
+            return redirect()->route('manager.dashboard'); // 👔 توجيه مدير المدرسة
+        }
+        if ($user->hasRole('admin') || $user->role === 'admin') {
+            return redirect()->route('admin.dashboard'); // 🎓 توجيه مسؤول الدراسة
+        }
+        if ($user->hasRole('teacher') || $user->role === 'teacher') {
+            return redirect()->route('teacher.dashboard'); // 👨‍🏫 توجيه المعلم
+        }
+        if ($user->hasRole('parent') || $user->role === 'parent') {
+            return redirect()->route('parent.dashboard'); // 👨‍👩‍👦 توجيه ولي الأمر
+        }
+        if ($user->hasRole('student') || $user->role === 'student') {
+            return redirect()->route('student.dashboard'); // 🎒 توجيه الطالب
+        }
+
+        // صمام الأمان: في حال لم يمتلك أي صلاحية صالحة
+        Auth::logout();
+        return redirect()->route('login.form')->withErrors(['email' => 'حسابك لا يملك أي صلاحيات للدخول إلى النظام.']);
     }
 }

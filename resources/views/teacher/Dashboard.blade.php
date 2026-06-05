@@ -146,17 +146,44 @@
             </div>
         </div>
 
-        {{-- الجدول الدراسي المصغر --}}
+        {{-- الجدول الدراسي المصغر (يعرض حصص اليوم الحالي) --}}
         <div class="col-lg-4">
             <div class="card shadow border-0 mb-4 h-100">
-                <div class="card-header bg-white py-3 border-bottom-0">
-                    <h6 class="m-0 fw-bold text-secondary">📅 جدول حصص اليوم</h6>
+                <div class="card-header bg-white py-3 border-bottom-0 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-bold text-secondary">
+                        📅 جدول اليوم ({{ $todayArabic }})
+                    </h6>
+                    <span class="badge bg-primary rounded-pill">{{ $todaySchedules->count() }} حصص</span>
                 </div>
-                <div class="card-body text-center py-5 d-flex flex-column justify-content-center">
-                    <i class="fas fa-calendar-day fa-4x text-light mb-3"></i>
-                    <p class="text-muted small">لا توجد حصص مسجلة لهذا اليوم.</p>
-                    {{-- رابط للجدول الكامل إذا كان متوفراً --}}
-                    <a href="#" class="btn btn-sm btn-link text-decoration-none">عرض الجدول الكامل</a>
+                <div class="card-body p-0 d-flex flex-column">
+                    @if($todaySchedules->count() > 0)
+                        <div class="list-group list-group-flush border-top-0 flex-grow-1">
+                            @foreach($todaySchedules as $schedule)
+                                <div class="list-group-item d-flex justify-content-between align-items-center py-3">
+                                    <div>
+                                        <h6 class="mb-1 fw-bold text-dark">{{ $schedule->subject->name ?? 'مادة' }}</h6>
+                                        <small class="text-muted"><i class="fas fa-layer-group me-1"></i> الفصل: {{ $schedule->schoolClass->name ?? $schedule->schoolClass->section ?? 'غير محدد' }}</small>
+                                    </div>
+                                    <span class="badge bg-light text-primary border p-2 fs-6 shadow-sm">
+                                        الحصة {{ $schedule->period }}
+                                    </span>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="text-center py-5 d-flex flex-column justify-content-center flex-grow-1">
+                            <i class="fas fa-mug-hot fa-4x text-light mb-3"></i>
+                            <p class="text-muted fw-bold mb-0">يوم راحة!</p>
+                            <p class="text-muted small">لا توجد حصص مسجلة لك في هذا اليوم.</p>
+                        </div>
+                    @endif
+                    
+                    {{-- زر الانتقال للجدول الكامل --}}
+                    <div class="p-3 text-center bg-light border-top mt-auto">
+                        <a href="{{ route('teacher.schedule.weekly') }}" class="btn btn-sm btn-dark rounded-pill px-4 shadow-sm fw-bold">
+                            <i class="fas fa-calendar-alt me-2"></i> عرض الجدول الأسبوعي كامل
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>

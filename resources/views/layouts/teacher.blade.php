@@ -35,6 +35,10 @@
             <i class="fas fa-chalkboard"></i> فصولي الدراسية
         </a>
 
+    <a class="nav-link" href="{{ route('teacher.schedule.weekly') }}">
+        <i class="fas fa-fw fa-calendar-alt"></i>
+        <span>جدولي الدراسي</span>
+    </a>
         
         <a href="{{ route('messages.index') }}" class="{{ request()->routeIs('messages.*') ? 'active' : '' }} d-flex justify-content-between">
             <div><i class="fas fa-comments"></i> المحادثات</div>

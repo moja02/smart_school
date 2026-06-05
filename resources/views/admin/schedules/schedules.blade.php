@@ -8,7 +8,7 @@
                 <h2 class="fw-bold mb-1">⚙️ إدارة تفضيلات المعلمين</h2>
                 <p class="mb-0 opacity-75">عرض وتعديل أوقات العمل المفضلة لكل معلم قبل توليد الجدول.</p>
             </div>
-            <a href="{{ route('admin.schedules.view') }}" class="btn btn-light rounded-pill px-4 fw-bold">
+            <a href="{{ route('admin.schedule.index') }}" class="btn btn-light rounded-pill px-4 fw-bold">
                 <i class="fas fa-calendar-alt me-2"></i> عرض الجدول العام
             </a>
         </div>
@@ -36,7 +36,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($teachers as $teacher)
+                        @forelse($teachers as $teacher)
                         <tr>
                             <td class="fw-bold">
                                 <div class="d-flex align-items-center">
@@ -62,12 +62,19 @@
                                 @endif
                             </td>
                             <td class="text-center">
-                                <a href="{{ route('admin.schedules.edit', $teacher->id) }}" class="btn btn-primary btn-sm rounded-pill px-4 shadow-sm">
+                                <a href="{{ route('admin.schedules.edit_preference', $teacher->id) }}" class="btn btn-primary btn-sm rounded-pill px-4 shadow-sm">
                                     <i class="fas fa-user-clock me-1"></i> ضبط الأوقات
                                 </a>
                             </td>
                         </tr>
-                        @endforeach
+                        @empty
+                        <tr>
+                            <td colspan="4" class="text-center py-5 text-muted fw-bold">
+                                <i class="fas fa-info-circle fa-2x mb-3 d-block text-secondary"></i>
+                                لا يوجد معلمين متاحين حالياً في النظام لعرضهم.
+                            </td>
+                        </tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>

@@ -13,70 +13,77 @@ class MessageController extends Controller
 {
     // دالة مساعدة لتحديد "من يُسمح لي بمراسلته؟"
     private function getAllowedUsers()
-{
-    $user = Auth::user();
-    $schoolId = $user->school_id;
+    {
+        $user = Auth::user();
+        $schoolId = $user->school_id;
 
-    // 1. 🟢 إذا كان مديراً (Manager): يرى كل من في مدرسته
-    if ($user->role == 'manager') {
-        return User::where('school_id', $schoolId)
-            ->where('id', '!=', $user->id)
-            ->get();
+        // 1. 🟢 إذا كان مديراً (Manager): يرى كل من في مدرسته
+        if ($user->role == 'manager') {
+            return User::where('school_id', $schoolId)
+                ->where('id', '!=', $user->id)
+                ->get();
+        }
+
+        // 2. 🔵 إذا كان أدمن (Admin): يرى المدير + المعلمين + الطلاب + أولياء الأمور
+        if ($user->role == 'admin') {
+            return User::where('school_id', $schoolId)
+                ->where('id', '!=', $user->id)
+                ->whereIn('role', ['manager', 'teacher', 'student', 'parent'])
+                ->get();
+        }
+
+        // 3. 🟡 إذا كان ولي أمر: يرى المدير + الإدارة + المعلمين + أبناءه
+        if ($user->role == 'parent') {
+            // ✅ تم التصحيح: جلب الـ user_id للأبناء من خلال جدول الربط parent_student
+            $childrenUserIds = StudentProfile::whereIn('id', function($query) use ($user) {
+                $query->select('student_id')
+                      ->from('parent_student')
+                      ->where('parent_id', $user->id);
+            })->pluck('user_id');
+
+            return User::where('school_id', $schoolId)
+                ->where(function($q) use ($childrenUserIds) {
+                    $q->whereIn('role', ['manager', 'admin', 'teacher'])
+                      ->orWhereIn('id', $childrenUserIds);
+                })
+                ->where('id', '!=', $user->id)
+                ->get();
+        }
+
+        // 4. 🔴 إذا كان طالباً: يرى المدير + المعلمين + الإدارة + ولي أمره
+        if ($user->role == 'student') {
+            // ✅ تم التصحيح: جلب الـ user_id لولي الأمر من خلال جدول الربط parent_student
+            $studentProfileId = $user->studentProfile->id ?? null;
+            $parentIds = DB::table('parent_student')
+                            ->where('student_id', $studentProfileId)
+                            ->pluck('parent_id');
+
+            return User::where('school_id', $schoolId)
+                ->where(function($q) use ($parentIds) {
+                    $q->whereIn('role', ['manager', 'admin', 'teacher']);
+                    if ($parentIds->isNotEmpty()) {
+                        $q->orWhereIn('id', $parentIds);
+                    }
+                })
+                ->where('id', '!=', $user->id)
+                ->get();
+        }
+
+        // 5. 🟣 إذا كان معلماً: يرى المدير + الإدارة + أولياء الأمور والطلاب
+        if ($user->role == 'teacher') {
+            return User::where('school_id', $schoolId)
+                ->where('id', '!=', $user->id)
+                ->whereIn('role', ['manager', 'admin', 'parent', 'student'])
+                ->get();
+        }
+
+        return collect(); // إذا لم يكن له دور معروف
     }
-
-    // 2. 🔵 إذا كان أدمن (Admin): يرى المدير + المعلمين + الطلاب + أولياء الأمور
-    if ($user->role == 'admin') {
-        return User::where('school_id', $schoolId)
-            ->where('id', '!=', $user->id)
-            ->whereIn('role', ['manager', 'teacher', 'student', 'parent'])
-            ->get();
-    }
-
-    // 3. 🟡 إذا كان ولي أمر: يرى المدير + الإدارة + المعلمين + أبناءه
-    if ($user->role == 'parent') {
-        $childrenUserIds = StudentProfile::where('parent_id', $user->id)->pluck('user_id');
-
-        return User::where('school_id', $schoolId)
-            ->where(function($q) use ($childrenUserIds) {
-                $q->whereIn('role', ['manager', 'admin', 'teacher'])
-                  ->orWhereIn('id', $childrenUserIds);
-            })
-            ->where('id', '!=', $user->id)
-            ->get();
-    }
-
-    // 4. 🔴 إذا كان طالباً: يرى المدير + المعلمين + الإدارة + ولي أمره
-    if ($user->role == 'student') {
-        $parentId = $user->studentProfile->parent_id ?? null;
-        $parentUserId = $parentId ? ParentProfile::find($parentId)->user_id : null;
-
-        return User::where('school_id', $schoolId)
-            ->where(function($q) use ($parentUserId) {
-                $q->whereIn('role', ['manager', 'admin', 'teacher']);
-                if ($parentUserId) {
-                    $q->orWhere('id', $parentUserId);
-                }
-            })
-            ->where('id', '!=', $user->id)
-            ->get();
-    }
-
-    // 5. 🟣 إذا كان معلماً: يرى المدير + الإدارة + أولياء الأمور والطلاب (أو حسب رغبتك)
-    if ($user->role == 'teacher') {
-        return User::where('school_id', $schoolId)
-            ->where('id', '!=', $user->id)
-            ->whereIn('role', ['manager', 'admin', 'parent', 'student'])
-            ->get();
-    }
-
-    return collect(); // إذا لم يكن له دور معروف
-}
-
 
     // 1. عرض قائمة المستخدمين لبدء محادثة
     public function index()
     {
-        // جلب كل المستخدمين ما عدا أنا
+        // جلب كل المستخدمين المسموح بمراسلتهم
         $users = $this->getAllowedUsers();
         return view('messages.index', compact('users'));
     }
@@ -101,7 +108,6 @@ class MessageController extends Controller
                     })
                     ->orderBy('created_at', 'asc')
                     ->get();
-
 
         $users = $this->getAllowedUsers();
 

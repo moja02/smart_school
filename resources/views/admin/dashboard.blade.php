@@ -2,46 +2,32 @@
 
 @section('content')
 
-@php
-    $school = \App\Models\School::find(auth()->user()->school_id);
-@endphp
-
-{{-- 1. الترويسة الرئيسية (نفس هيكلية الملف الأصلي لكن بخط أبيض وخلفية داكنة) --}}
+{{-- 1. الترويسة الرئيسية --}}
 <div class="card page-header-card mb-4 shadow border-0 bg-dark text-white">
     <div class="card-body d-flex justify-content-between align-items-center">
         <div>
-            {{-- النص أبيض كما طلبت --}}
             <h2 class="fw-bold mb-1 text-white">لوحة التحكم 📊</h2>
             <p class="mb-0 opacity-75">
                 أهلاً بك، المدير <strong>{{ Auth::user()->name }}</strong> 👋. إليك ملخص سريع لما يحدث اليوم.
             </p>
             
-            {{-- زر التحكم في الرصد (تم دمجه هنا للحفاظ على الهيكلية) --}}
             <div class="mt-3">
-                <form action="{{ route('admin.grading.toggle') }}" method="POST" class="d-inline-block">
-                    @csrf
-                    @if($school->grading_locked)
-                        <button type="submit" class="btn btn-danger btn-sm shadow-sm fw-bold px-3">
-                            <i class="fas fa-lock me-1"></i> الرصد مغلق (اضغط لفتحه)
-                        </button>
-                    @else
-                        <button type="submit" class="btn btn-success btn-sm shadow-sm fw-bold px-3">
-                            <i class="fas fa-unlock me-1"></i> الرصد متاح (اضغط لإغلاقه)
-                        </button>
-                    @endif
-                </form>
-                <span class="text-white-50 ms-2 small"><i class="fas fa-calendar me-1"></i> {{ date('Y-m-d') }}</span>
+                <span class="badge bg-light text-dark shadow-sm px-3 py-2 fs-6">
+                    <i class="fas fa-calendar-alt text-primary me-2"></i> {{ date('Y-m-d') }}
+                </span>
             </div>
         </div>
         
-        {{-- الأيقونة الكبيرة (من الملف الأصلي) --}}
         <div class="d-none d-md-block">
             <i class="fas fa-school fa-4x opacity-25 text-white"></i>
         </div>
     </div>
 </div>
+<div >
+    
+</div>
 
-{{-- 2. بطاقات الإحصائيات (نفس الملف الأصلي) --}}
+{{-- 2. بطاقات الإحصائيات --}}
 <div class="row g-4 mb-4">
     <div class="col-md-3">
         <div class="card border-0 shadow-sm h-100 py-2 border-start border-4 border-primary">
@@ -108,7 +94,7 @@
     </div>
 </div>
 
-{{-- 3. القسم السفلي: الوصول السريع (الجديد) + التقويم --}}
+{{-- 3. القسم السفلي: الوصول السريع + التقويم --}}
 <div class="row">
     {{-- الوصول السريع والعمليات --}}
     <div class="col-lg-8">
@@ -170,7 +156,6 @@
 <style>
     .hover-scale { transition: transform 0.2s; }
     .hover-scale:hover { transform: translateY(-5px); }
-    /* لضمان أن خلفية الهيدر داكنة ليظهر الخط الأبيض */
     .bg-dark { background-color: #212529 !important; }
 </style>
 
