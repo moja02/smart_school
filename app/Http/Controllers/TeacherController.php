@@ -18,9 +18,11 @@ class TeacherController extends Controller
 {
     public function dashboard()
     {
-        $teacherId = \Illuminate\Support\Facades\Auth::id();
+        // جلب المعلم مع جدول حصصه والمواد والفصول المرتبطة بها
+        $teacher = auth()->user()->load(['schedules.subject', 'schedules.schoolClass']);
+        $teacherId = $teacher->id;
 
-        // 1. جلب الفصول (الشعب) التي يدرسها المعلم
+        // 1. إحصائيات سريعة
         $classes = \Illuminate\Support\Facades\DB::table('teacher_subject_section')
             ->join('classes', 'teacher_subject_section.section_id', '=', 'classes.id')
             ->where('teacher_subject_section.teacher_id', $teacherId)
@@ -28,35 +30,32 @@ class TeacherController extends Controller
             ->distinct()
             ->get();
 
-        // 2. حساب إجمالي عدد الطلاب في هذه الفصول
-        // ✅ التعديل: استخدام جدول student_profiles بدلاً من users
-        // تأكد أن اسم الجدول لديك هو 'student_profiles' واسم العمود 'class_id' أو 'section_id'
         $studentsCount = \Illuminate\Support\Facades\DB::table('student_profiles')
-            ->whereIn('class_id', $classes->pluck('id')) // إذا كان العمود اسمه section_id غيره هنا
+            ->whereIn('class_id', $classes->pluck('id'))
             ->count();
 
-        /* ملاحظة: إذا لم يكن لديك جدول student_profiles، 
-        وكان الطلاب مرتبطين بالفصل في جدول users مباشرة، 
-        تأكد من أن العمود في قاعدة البيانات اسمه class_id أو section_id وعدل الكود أعلاه.
-        */
-
-        // 3. حساب عدد المواد التي يدرسها المعلم
         $subjectsCount = \Illuminate\Support\Facades\DB::table('teacher_subject_section')
             ->where('teacher_id', $teacherId)
             ->distinct('subject_id')
             ->count('subject_id');
 
-        // 4. عدد الفصول للعرض
         $classesCount = $classes->count();
 
-        // 5. آخر الرسائل
-        $recentMessages = \App\Models\Message::where('receiver_id', $teacherId)
-            ->where('is_read', 0)
-            ->latest()
-            ->take(5)
-            ->get();
+        // 2. تحديد اليوم الحالي باللغة العربية (لأن الجدول محفوظ بالعربي)
+        $englishDay = date('l'); // مثلاً: Sunday
+        $arabicDays = [
+            'Sunday' => 'الأحد', 'Monday' => 'الإثنين', 'Tuesday' => 'الثلاثاء', 
+            'Wednesday' => 'الأربعاء', 'Thursday' => 'الخميس', 'Friday' => 'الجمعة', 'Saturday' => 'السبت'
+        ];
+        $todayArabic = $arabicDays[$englishDay] ?? 'الأحد';
 
-        return view('teacher.dashboard', compact('classes', 'classesCount', 'studentsCount', 'subjectsCount', 'recentMessages'));
+        // 3. جلب حصص المعلم لهذا اليوم فقط وترتيبها حسب رقم الحصة
+        $todaySchedules = $teacher->schedules->where('day', $todayArabic)->sortBy('period');
+
+        // جلب إعدادات المدرسة (للقفل)
+        $school = \App\Models\School::find($teacher->school_id);
+
+        return view('teacher.dashboard', compact('classes', 'classesCount', 'studentsCount', 'subjectsCount', 'school', 'todaySchedules', 'todayArabic'));
     }
 
     public function students(Request $request)
@@ -188,14 +187,15 @@ class TeacherController extends Controller
     public function editFinalGrades($subjectId, $sectionId)
     {
         $teacherId = auth()->user()->id;
-        $isLocked = \DB::table('schools')->where('id', auth()->user()->school_id)->value('grading_locked');
+        $schoolId = auth()->user()->school_id;
+        $isLocked = \DB::table('schools')->where('id', $schoolId)->value('grading_locked');
 
         // جلب البيانات الأساسية
         $subject = \DB::table('subjects')->find($subjectId);
         $section = \DB::table('classes')->find($sectionId);
         $grade = \DB::table('grades')->find($section->grade_id);
 
-        // جلب الطلاب ودرجاتهم من الجدول الرئيسي
+        // جلب الطلاب
         $students = \App\Models\User::role('student')
             ->whereHas('studentProfile', function($q) use ($sectionId) {
                 $q->where('class_id', $sectionId);
@@ -203,18 +203,28 @@ class TeacherController extends Controller
             ->orderBy('name')
             ->get();
 
+        // جلب الدرجات
         $scores = \DB::table('student_scores')
             ->where('subject_id', $subjectId)
-            ->where('class_id', $sectionId)
+            ->where('class_id', $sectionId) // تأكد أن هذا هو اسم العمود لديك الذي يخزن رقم الشعبة
             ->get()
             ->keyBy('student_id');
 
-        // جلب الدرجة العظمى للنهائي من إعدادات المادة (مثلاً 60)
-        $maxFinal = \DB::table('school_subject_settings')
-            ->where('school_id', auth()->user()->school_id)
-            ->value('final_score') ?? 60;
+        // 💡 جلب الدرجة العظمى للنهائي بطريقة آمنة
+        $settings = \DB::table('school_subject_settings')
+            ->where('school_id', $schoolId)
+            ->where('subject_id', $subjectId)
+            ->first();
+            
+        $maxFinal = ($settings && isset($settings->final_score) && $settings->final_score > 0) ? $settings->final_score : 60;
+        
+        // 💡 حساب الحد الأقصى لكل فصل دراسي (النصف)
+        $maxFinalPerSem = $maxFinal / 2;
 
-        return view('teacher.assessments.final_edit', compact('subject', 'section', 'grade', 'students', 'scores', 'isLocked', 'maxFinal'));
+        return view('teacher.assessments.final_edit', compact(
+            'subject', 'section', 'grade', 'students', 'scores', 
+            'isLocked', 'maxFinal', 'maxFinalPerSem'
+        ));
     }
 
     public function storeFinalGrades(Request $request)
@@ -222,7 +232,17 @@ class TeacherController extends Controller
         $isLocked = \DB::table('schools')->where('id', auth()->user()->school_id)->value('grading_locked');
         if ($isLocked) return back()->with('error', 'الرصد مغلق حالياً 🔒');
 
-        foreach ($request->final_marks as $studentId => $mark) {
+        $schoolId = auth()->user()->school_id;
+
+        // الدوران على درجات الفصل الأول (التي تحتوي على أرقام الطلاب كـ Keys)
+        foreach ($request->final_marks_sem1 as $studentId => $markSem1) {
+            
+            // جلب درجة الفصل الثاني لنفس الطالب
+            $markSem2 = $request->final_marks_sem2[$studentId] ?? 0;
+            
+            // حساب المجموع النهائي
+            $totalFinal = floatval($markSem1 ?? 0) + floatval($markSem2 ?? 0);
+
             \DB::table('student_scores')->updateOrInsert(
                 [
                     'student_id' => $studentId,
@@ -230,18 +250,20 @@ class TeacherController extends Controller
                     'class_id'   => $request->section_id,
                 ],
                 [
-                    'school_id' => auth()->user()->school_id,
-                    'final_score' => $mark ?? 0,
+                    'school_id' => $schoolId,
+                    'final_score_sem1' => $markSem1 ?? 0, // درجة الفصل الأول
+                    'final_score_sem2' => $markSem2 ?? 0, // درجة الفصل الثاني
+                    'final_score'      => $totalFinal,    // المجموع الكلي للنهائي
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]
             );
-
         }
 
-        return back()->with('success', 'تم رصد درجات الامتحان النهائي بنجاح ✅');
+        return back()->with('success', 'تم رصد درجات الامتحان النهائي للفصلين بنجاح ✅');
     }
 
+    
     // عرض قائمة الفصول الدراسية للمعلم
     public function myClasses()
 {
@@ -396,21 +418,142 @@ class TeacherController extends Controller
         return back()->with('success', 'تم حذف السؤال من بنك الأسئلة بنجاح.');
     }
 
-    // 2. التقييمات
+    // 2. التقييمات (محدثة بالاعتماد على دالة المودل)
+    // ==========================================
+    // 💡 إدارة التقييمات الذكية (Assessments)
+    // ==========================================
+    
+    // ==========================================
+    // 💡 إدارة التقييمات الذكية (Assessments)
+    // ==========================================
+    
+    // ==========================================
+    // 💡 إدارة التقييمات (بالاعتماد على المجموع الكلي)
+    // ==========================================
+    
     public function createAssessment($subject_id, $class_id) {
         $subject = Subject::findOrFail($subject_id);
         $class = SchoolClass::findOrFail($class_id);
-        $assessments = Assessment::where('subject_id', $subject_id)->where('teacher_id', Auth::id())->get();
-        return view('teacher.assessments.index', compact('subject', 'class', 'assessments'));
+        $teacherId = Auth::id();
+        $schoolId = auth()->user()->school_id;
+
+        // 1. جلب التقييمات التابعة للمادة + الشعبة + المعلم
+        $assessments = Assessment::where('subject_id', $subject_id)
+                        ->where('section_id', $class_id) 
+                        ->where('teacher_id', $teacherId)
+                        ->get();
+
+        // 2. جلب درجة أعمال السنة الكلية (بشكل آمن)
+        $settings = \DB::table('school_subject_settings')
+                        ->where('school_id', $schoolId)
+                        ->where('subject_id', $subject_id)
+                        ->first();
+                        
+        $totalWorksScore = ($settings && isset($settings->works_score) && $settings->works_score > 0) ? $settings->works_score : 40; 
+        
+        // 3. حساب المجموع الكلي للتقييمات المسجلة حالياً
+        $currentTotalSum = $assessments->sum('max_score');
+
+        // 4. استخراج الرصيد المتبقي الكلي
+        $remainingScore = max(0, $totalWorksScore - $currentTotalSum);
+
+        $isLocked = \DB::table('schools')->where('id', $schoolId)->value('grading_locked');
+
+        return view('teacher.assessments.index', compact(
+            'subject', 'class', 'assessments', 'isLocked', 
+            'totalWorksScore', 'remainingScore', 'currentTotalSum'
+        ));
     }
 
     public function storeAssessment(Request $request, $subject_id, $class_id) {
-        $request->validate(['title' => 'required', 'max_score' => 'required|integer|min:1']);
-        Assessment::create([
-            'subject_id' => $subject_id, 'teacher_id' => Auth::id(),
-            'title' => $request->title, 'max_score' => $request->max_score
+        $request->validate([
+            'name'      => 'required|string|max:255', 
+            'max_score' => 'required|numeric|min:0.5',
+            'semester'  => 'required|in:1,2' // أبقيناها فقط للتصنيف في الجدول
         ]);
-        return back()->with('success', 'تم إنشاء التقييم');
+
+        $teacherId = Auth::id();
+        $schoolId = auth()->user()->school_id;
+        $newScore = $request->max_score;
+
+        $settings = \DB::table('school_subject_settings')
+                        ->where('school_id', $schoolId)
+                        ->where('subject_id', $subject_id)
+                        ->first();
+        $totalWorksScore = ($settings && isset($settings->works_score) && $settings->works_score > 0) ? $settings->works_score : 40;
+
+        // حساب المجموع الحالي لهذه الشعبة
+        $currentTotalSum = \App\Models\Assessment::where('subject_id', $subject_id)
+                                ->where('section_id', $class_id) 
+                                ->where('teacher_id', $teacherId)
+                                ->sum('max_score');
+
+        // التحقق من أننا لن نتجاوز الحد الكلي
+        if (($currentTotalSum + $newScore) > $totalWorksScore) {
+            $remaining = max(0, $totalWorksScore - $currentTotalSum);
+            return back()->with('error', "عذراً! الحد الأقصى لأعمال السنة هو ($totalWorksScore درجة). المتبقي لك هو ($remaining درجة) فقط.");
+        }
+
+        \App\Models\Assessment::create([
+            'subject_id' => $subject_id,
+            'section_id' => $class_id, 
+            'teacher_id' => $teacherId,
+            'name'       => $request->name,  
+            'max_score'  => $newScore,
+            'semester'   => $request->semester
+        ]);
+        
+        return back()->with('success', 'تم إنشاء التقييم بنجاح ✅');
+    }
+
+    public function updateAssessment(Request $request, $id)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'max_score' => 'required|numeric|min:0.5',
+        ]);
+
+        $assessment = \App\Models\Assessment::findOrFail($id);
+        $schoolId = auth()->user()->school_id;
+
+        $settings = \DB::table('school_subject_settings')
+                        ->where('school_id', $schoolId)
+                        ->where('subject_id', $assessment->subject_id)
+                        ->first();
+        $totalWorksScore = ($settings && isset($settings->works_score) && $settings->works_score > 0) ? $settings->works_score : 40;
+        
+        // الفحص يشمل نفس الشعبة مع استثناء التقييم الحالي
+        $currentTotalSum = \App\Models\Assessment::where('subject_id', $assessment->subject_id)
+                                ->where('section_id', $assessment->section_id) 
+                                ->where('teacher_id', auth()->id())
+                                ->where('id', '!=', $id) 
+                                ->sum('max_score');
+
+        if (($currentTotalSum + $request->max_score) > $totalWorksScore) {
+            $remaining = max(0, $totalWorksScore - $currentTotalSum);
+            return back()->with('error', "لا يمكن الحفظ! أقصى درجة متبقية يمكنك وضعها هي ($remaining درجة).");
+        }
+
+        $assessment->update([
+            'name' => $request->name,
+            'max_score' => $request->max_score
+        ]);
+
+        return back()->with('success', 'تم تعديل التقييم بنجاح ✅');
+    }
+
+    // حذف التقييم
+    public function destroyAssessment($id)
+    {
+        $assessment = \App\Models\Assessment::findOrFail($id);
+        
+        // حذف الدرجات المرتبطة بهذا التقييم أولاً (لتجنب أخطاء قاعدة البيانات)
+        \App\Models\AssessmentMark::where('assessment_id', $id)->delete();
+        
+        // حذف التقييم
+        $assessment->delete();
+
+        return back()->with('success', 'تم حذف التقييم ودرجاته بنجاح 🗑️');
     }
 
     // 3. رصد الدرجات
@@ -912,5 +1055,15 @@ public function deleteExam(Request $request)
     return response()->json(['success' => 'تم حذف الامتحان']);
 }
 
+public function myWeeklySchedule()
+    {
+        // جلب المعلم مع جميع حصصه والمواد والفصول (Eager Loading لتسريع الأداء)
+        $teacher = auth()->user()->load(['schedules.subject', 'schedules.schoolClass']);
 
+        // تعريف الأيام والحصص بنفس الطريقة المستخدمة في لوحة الإدارة
+        $days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+        $periods = [1, 2, 3, 4, 5, 6, 7]; // افترضنا 7 حصص، يمكنك تعديلها حسب مدرستك
+
+        return view('teacher.schedule.weekly', compact('teacher', 'days', 'periods'));
+    }
 }

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Assessment extends Model
 {
+    
     protected $guarded = []; // السماح بحفظ جميع البيانات
 
     // علاقة التقييم بالمادة

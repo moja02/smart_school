@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Database\Eloquent\Factories\HasFactory; // كان ناقصاً
+use Illuminate\Database\Eloquent\Factories\HasFactory; 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -145,4 +145,16 @@ class User extends Authenticatable
         // الطالب ينتمي إلى شعبة واحدة (التي جدولها هو classes)
         return $this->belongsTo(SchoolClass::class, 'class_id'); 
     }
+
+    
+    public function schedules()
+    {
+        return $this->hasMany(Schedule::class, 'teacher_id');
+    }
+    
+    public function preferences()
+{
+    return $this->hasMany(TeacherPreference::class, 'teacher_id');
+}
+
 } 

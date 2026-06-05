@@ -36,19 +36,22 @@
                         </select>
                     </div>
 
-                    {{-- اختيار الطلاب --}}
+                    {{-- اختيار الطلاب (المحدث) --}}
                     <div class="mb-3">
-                        <label class="form-label fw-bold">2. اختر الأبناء (الطلاب)</label>
-                        {{-- تم تكبير القائمة قليلاً لتسهيل الاختيار المتعدد --}}
-                        <select name="student_ids[]" class="form-select shadow-sm" multiple style="height: 200px;" required>
-                            @foreach($students as $student)
+                        <label class="form-label fw-bold">2. اختر الأبناء (الطلاب غير المرتبطين)</label>
+                        <select name="student_ids[]" class="form-select shadow-sm" multiple style="height: 200px;" required {{ $students->isEmpty() ? 'disabled' : '' }}>
+                            @forelse($students as $student)
                                 <option value="{{ $student->id }}" class="p-2 border-bottom">
                                     {{ $student->name }} 
                                     @if($student->studentProfile && $student->studentProfile->class)
                                         - ({{ $student->studentProfile->class->name }})
                                     @endif
                                 </option>
-                            @endforeach
+                            @empty
+                                <option disabled class="text-success fw-bold text-center mt-4" style="background: transparent;">
+                                    ✅ جميع الطلاب في النظام مرتبطون حالياً.
+                                </option>
+                            @endforelse
                         </select>
                         <div class="form-text text-primary mt-2">
                             <i class="fas fa-mouse-pointer"></i> اضغط باستمرار على زر <b>Ctrl</b> (أو Command) لتحديد عدة طلاب في آن واحد.
@@ -57,7 +60,8 @@
 
                     <hr>
 
-                    <button type="submit" class="btn btn-primary w-100 btn-lg shadow">
+                    {{-- زر الحفظ يغلق تلقائياً إذا لم يكن هناك طلاب للربط --}}
+                    <button type="submit" class="btn btn-primary w-100 btn-lg shadow" {{ $students->isEmpty() ? 'disabled' : '' }}>
                         <i class="fas fa-link me-2"></i> حفظ واربط
                     </button>
                 </form>
@@ -71,7 +75,7 @@
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                 <h6 class="fw-bold text-dark m-0"><i class="fas fa-list me-1"></i> العائلات المسجلة</h6>
                 
-                {{-- ✅ تصحيح: البحث يتم في نفس الصفحة الحالية --}}
+                {{-- البحث يتم في نفس الصفحة الحالية --}}
                 <form action="{{ url()->current() }}" method="GET" class="d-flex" style="max-width: 250px;">
                     <div class="input-group input-group-sm">
                         <input type="text" name="search" class="form-control" placeholder="بحث عن ولي أمر..." value="{{ request('search') }}">
@@ -95,7 +99,7 @@
                                 <td class="ps-4">
                                     <div class="d-flex align-items-center">
                                         <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 40px; height: 40px; font-size: 1.2rem;">
-                                            {{ substr($parent->name, 0, 1) }}
+                                            {{ mb_substr($parent->name, 0, 1) }}
                                         </div>
                                         <div>
                                             <a href="#" class="d-block fw-bold text-decoration-none text-dark">{{ $parent->name }}</a>
@@ -150,7 +154,7 @@
             {{-- الترقيم (Pagination) --}}
             @if($parentsWithChildren instanceof \Illuminate\Pagination\LengthAwarePaginator)
                 <div class="card-footer bg-white py-3">
-                    {{ $parentsWithChildren->appends(request()->query())->links() }}
+                    {{ $parentsWithChildren->appends(request()->query())->links('pagination::bootstrap-5') }}
                 </div>
             @endif
         </div>

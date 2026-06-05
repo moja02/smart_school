@@ -4,101 +4,176 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Models\Assessment;
+use App\Models\Subject;
+use App\Models\SchoolClass;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class AssessmentController extends Controller
 {
-    // عرض قائمة التقييمات لهذا الفصل
+    // ==========================================
+    // 1. عرض قائمة التقييمات
+    // ==========================================
     public function index($subjectId, $sectionId)
     {
         $teacherId = auth()->user()->id;
         $schoolId = auth()->user()->school_id;
-        // جلب البيانات الأساسية
-        $subject = DB::table('subjects')->find($subjectId);
-        $section = DB::table('classes')->find($sectionId);
 
-        // إضافة حماية: إذا لم يجد الشعبة، لا يكمل الكود
-        if (!$section) {
-            abort(404, 'الشعبة غير موجودة، تأكد من صحة الرابط.');
-        }
-        $grade = DB::table('grades')->find($section->grade_id);
+        $subject = Subject::findOrFail($subjectId);
+        $section = SchoolClass::findOrFail($sectionId); 
 
-        // جلب التقييمات التي أنشأها المعلم لهذا الفصل
-        $assessments = DB::table('assessments')
-            ->where('subject_id', $subjectId)
+        // جلب التقييمات التي أنشأها المعلم لهذه الشعبة وهذه المادة
+        $assessments = Assessment::where('subject_id', $subjectId)
             ->where('section_id', $sectionId)
+            ->where('teacher_id', $teacherId)
             ->get();
 
-        // حساب مجموع درجات التقييمات الحالية
-        $currentTotalMax = $assessments->sum('max_score');
-
-        // جلب الحد الأقصى لأعمال السنة المحدد من الإدارة
-        // نفترض أن جدول الإعدادات لديك اسمه school_subject_settings وفيه عمود works_max_score
-        // إذا لم يوجد نضع قيمة افتراضية مثلاً 40
+        // 💡 جلب الدرجة الكلية لأعمال السنة
         $settings = DB::table('school_subject_settings')
             ->where('school_id', $schoolId)
-            ->first(); // أو يمكنك التخصيص حسب الصف والمادة إذا كان تصميمك يدعم ذلك
+            ->where('subject_id', $subjectId)
+            ->first();
             
-        $allowedMaxWorks = $settings->works_score ?? 40; // الدرجة المسموحة لأعمال السنة
+        $totalWorksScore = ($settings && isset($settings->works_score) && $settings->works_score > 0) ? $settings->works_score : 40;
 
-        // جلب حالة القفل
-        $isLocked = \DB::table('schools')->where('id', auth()->user()->school_id)->value('grading_locked');
-        return view('teacher.assessments.index', compact('subject', 'section', 'assessments', 'currentTotalMax', 'allowedMaxWorks', 'isLocked'));
+        // 💡 تقسيم الدرجة على 2 (الحد الأقصى لكل سميستر)
+        $maxPerSemester = $totalWorksScore / 2;
+
+        // 💡 حساب مجموع ما تم تسجيله في كل سميستر على حدة
+        $sumSem1 = $assessments->where('semester', 1)->sum('max_score');
+        $sumSem2 = $assessments->where('semester', 2)->sum('max_score');
+
+        // 💡 حساب الرصيد المتبقي لكل سميستر
+        $remSem1 = max(0, $maxPerSemester - $sumSem1);
+        $remSem2 = max(0, $maxPerSemester - $sumSem2);
+
+        $isLocked = DB::table('schools')->where('id', $schoolId)->value('grading_locked');
+
+        return view('teacher.assessments.index', compact(
+            'subject', 'section', 'assessments', 'isLocked',
+            'maxPerSemester', 'remSem1', 'remSem2'
+        ));
     }
 
-    // إنشاء تقييم جديد
+    // ==========================================
+    // 2. إنشاء تقييم جديد
+    // ==========================================
     public function store(Request $request)
     {
-        $isLocked = \DB::table('schools')->where('id', auth()->user()->school_id)->value('grading_locked');
+        $schoolId = auth()->user()->school_id;
+        $isLocked = DB::table('schools')->where('id', $schoolId)->value('grading_locked');
         if ($isLocked) return back()->with('error', 'الرصد مغلق حالياً 🔒');
 
         $request->validate([
-            'name' => 'required|string|max:191',
-            'max_score' => 'required|numeric|min:1',
+            'name'       => 'required|string|max:191',
+            'max_score'  => 'required|numeric|min:0.5',
             'subject_id' => 'required',
             'section_id' => 'required',
+            'semester'   => 'required|in:1,2'
         ]);
 
-        $schoolId = auth()->user()->school_id;
+        $teacherId = auth()->id();
+        $newScore = $request->max_score;
+        $requestedSemester = $request->semester;
 
-        // 1. التحقق من الحد الأقصى
-        $settings = DB::table('school_subject_settings')->where('school_id', $schoolId)->first();
-        $allowedMaxWorks = $settings->works_score ?? 40;
-
-        // مجموع التقييمات السابقة لهذا الفصل
-        $currentSum = DB::table('assessments')
+        // جلب الدرجة الكلية وحساب حد السميستر
+        $settings = DB::table('school_subject_settings')
+            ->where('school_id', $schoolId)
             ->where('subject_id', $request->subject_id)
+            ->first();
+        $totalWorksScore = ($settings && isset($settings->works_score) && $settings->works_score > 0) ? $settings->works_score : 40;
+        $maxPerSemester = $totalWorksScore / 2;
+
+        // مجموع التقييمات السابقة *لهذا السميستر تحديداً*
+        $currentSemesterSum = Assessment::where('subject_id', $request->subject_id)
             ->where('section_id', $request->section_id)
+            ->where('teacher_id', $teacherId)
+            ->where('semester', $requestedSemester)
             ->sum('max_score');
 
-        // هل الإضافة الجديدة ستتجاوز الحد المسموح؟
-        if (($currentSum + $request->max_score) > $allowedMaxWorks) {
-            return back()->with('error', "خطأ: لا يمكن إنشاء التقييم. المجموع سيصبح " . ($currentSum + $request->max_score) . " والحد الأقصى المسموح هو $allowedMaxWorks");
+        // التحقق
+        if (($currentSemesterSum + $newScore) > $maxPerSemester) {
+            $remaining = max(0, $maxPerSemester - $currentSemesterSum);
+            $semName = $requestedSemester == 1 ? 'الأول' : 'الثاني';
+            return back()->with('error', "خطأ: لا يمكن إنشاء التقييم. أقصى درجة متبقية للفصل الدراسي $semName هي ($remaining درجة).");
         }
 
-        // 2. إنشاء التقييم
-        DB::table('assessments')->insert([
-            'school_id' => $schoolId,
-            'teacher_id' => auth()->user()->id,
+        // إنشاء التقييم
+        Assessment::create([
+            'teacher_id' => $teacherId,
             'subject_id' => $request->subject_id,
             'section_id' => $request->section_id,
-            'name' => $request->name,
-            'max_score' => $request->max_score,
-            'created_at' => now(),
-            'updated_at' => now(),
+            'name'       => $request->name,
+            'max_score'  => $newScore,
+            'semester'   => $requestedSemester
         ]);
 
         return back()->with('success', 'تم إنشاء التقييم بنجاح');
     }
 
-    // واجهة رصد الدرجات لتقييم معين
+    // ==========================================
+    // 3. تعديل التقييم
+    // ==========================================
+    public function update(Request $request, $id)
+    {
+        $request->validate([
+            'name'      => 'required|string|max:255',
+            'max_score' => 'required|numeric|min:0.5',
+        ]);
+
+        $assessment = Assessment::findOrFail($id);
+        $schoolId = auth()->user()->school_id;
+
+        $settings = DB::table('school_subject_settings')
+            ->where('school_id', $schoolId)
+            ->where('subject_id', $assessment->subject_id)
+            ->first();
+        $totalWorksScore = ($settings && isset($settings->works_score) && $settings->works_score > 0) ? $settings->works_score : 40;
+        $maxPerSemester = $totalWorksScore / 2;
+        
+        // الفحص يشمل نفس الشعبة ونفس السميستر مع استثناء التقييم الحالي
+        $currentSemesterSum = Assessment::where('subject_id', $assessment->subject_id)
+            ->where('section_id', $assessment->section_id) 
+            ->where('teacher_id', auth()->id())
+            ->where('semester', $assessment->semester)
+            ->where('id', '!=', $id) 
+            ->sum('max_score');
+
+        if (($currentSemesterSum + $request->max_score) > $maxPerSemester) {
+            $remaining = max(0, $maxPerSemester - $currentSemesterSum);
+            return back()->with('error', "لا يمكن الحفظ! أقصى درجة متبقية يمكنك وضعها في هذا السميستر هي ($remaining درجة).");
+        }
+
+        $assessment->update([
+            'name'      => $request->name,
+            'max_score' => $request->max_score
+        ]);
+
+        return back()->with('success', 'تم تعديل التقييم بنجاح ✅');
+    }
+
+    // ==========================================
+    // 4. حذف التقييم
+    // ==========================================
+    public function destroy($id)
+    {
+        $assessment = Assessment::findOrFail($id);
+        DB::table('assessment_marks')->where('assessment_id', $id)->delete();
+        $assessment->delete();
+
+        return back()->with('success', 'تم حذف التقييم ودرجاته بنجاح 🗑️');
+    }
+
+    // ==========================================
+    // 5. واجهة رصد الدرجات لتقييم معين
+    // ==========================================
     public function editMarks($assessmentId)
     {
         $assessment = DB::table('assessments')->find($assessmentId);
         $subject = DB::table('subjects')->find($assessment->subject_id);
         $section = DB::table('classes')->find($assessment->section_id);
 
-        // جلب الطلاب
         $students = User::role('student')
             ->whereHas('studentProfile', function($q) use ($assessment) {
                 $q->where('class_id', $assessment->section_id);
@@ -106,20 +181,21 @@ class AssessmentController extends Controller
             ->orderBy('name')
             ->get();
 
-        // جلب الدرجات المرصودة سابقاً لهذا التقييم
         $marks = DB::table('assessment_marks')
             ->where('assessment_id', $assessmentId)
             ->pluck('score', 'student_id');
 
-        $isLocked = \DB::table('schools')->where('id', auth()->user()->school_id)->value('grading_locked');
+        $isLocked = DB::table('schools')->where('id', auth()->user()->school_id)->value('grading_locked');
 
         return view('teacher.assessments.marks', compact('assessment', 'subject', 'section', 'students', 'marks', 'isLocked'));
     }
 
-    // حفظ الدرجات وتحديث الجدول الرئيسي student_scores
+    // ==========================================
+    // 6. حفظ درجات التقييم للطلاب
+    // ==========================================
     public function saveMarks(Request $request)
     {
-        $isLocked = \DB::table('schools')->where('id', auth()->user()->school_id)->value('grading_locked');
+        $isLocked = DB::table('schools')->where('id', auth()->user()->school_id)->value('grading_locked');
         if ($isLocked) return back()->with('error', 'الرصد مغلق حالياً 🔒');
 
         $assessmentId = $request->assessment_id;
@@ -127,16 +203,13 @@ class AssessmentController extends Controller
         $maxScore = $assessment->max_score;
 
         foreach ($request->marks as $studentId => $score) {
-            // التحقق أن الدرجة لا تتجاوز درجة التقييم
             if ($score > $maxScore) continue; 
             
-            // 1. حفظ الدرجة في جدول العلامات الفرعي
             DB::table('assessment_marks')->updateOrInsert(
                 ['assessment_id' => $assessmentId, 'student_id' => $studentId],
                 ['score' => $score ?? 0, 'updated_at' => now()]
             );
 
-            // 2. تحديث مجموع أعمال السنة في الجدول الرئيسي (student_scores)
             $this->updateMainStudentScore($studentId, $assessment->subject_id, $assessment->section_id);
         }
 
@@ -146,15 +219,13 @@ class AssessmentController extends Controller
     // دالة مساعدة لحساب المجموع الكلي وتحديثه
     private function updateMainStudentScore($studentId, $subjectId, $sectionId)
     {
-        // نجمع كل درجات الطالب في كل التقييمات لهذه المادة
         $totalWorks = DB::table('assessment_marks')
             ->join('assessments', 'assessment_marks.assessment_id', '=', 'assessments.id')
             ->where('assessment_marks.student_id', $studentId)
             ->where('assessments.subject_id', $subjectId)
-            ->where('assessments.section_id', $sectionId) // تأكدنا أنها لنفس الشعبة
+            ->where('assessments.section_id', $sectionId) 
             ->sum('assessment_marks.score');
 
-        // تحديث works_score في الجدول الرئيسي
         DB::table('student_scores')->updateOrInsert(
             [
                 'student_id' => $studentId, 
@@ -162,12 +233,10 @@ class AssessmentController extends Controller
                 'class_id' => $sectionId
             ],
             [
-                'school_id' => auth()->user()->school_id,
+                'school_id'   => auth()->user()->school_id,
                 'works_score' => $totalWorks,
-                // نترك final_score كما هو ولا نعدله من هنا
-                'updated_at' => now()
+                'updated_at'  => now()
             ]
         );
-        
     }
 }

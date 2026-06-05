@@ -14,8 +14,11 @@
         }
         .header { border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 30px; }
         .student-info { background-color: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-        .marks-table th { background-color: #eee !important; border: 1px solid #000 !important; }
+        
+        /* تنسيقات الجدول */
+        .marks-table th { background-color: #eee !important; border: 1px solid #000 !important; vertical-align: middle; }
         .marks-table td { border: 1px solid #000 !important; vertical-align: middle; }
+        
         .footer { margin-top: 50px; }
         @media print {
             .no-print { display: none !important; }
@@ -55,43 +58,61 @@
 
         <table class="table table-bordered text-center marks-table">
             <thead>
+                {{-- الصف الأول من الترويسة --}}
                 <tr>
-                    <th style="width: 40%">المادة الدراسية</th>
-                    <th>أعمال السنة</th>
-                    <th>الامتحان النهائي</th>
-                    <th>المجموع الكلي</th>
-                    <th>التقدير</th>
+                    <th rowspan="2" style="width: 26%">المادة الدراسية</th>
+                    <th colspan="2">الفصل الدراسي الأول</th>
+                    <th colspan="2">الفصل الدراسي الثاني</th>
+                    <th rowspan="2" style="width: 12%">المجموع الكلي</th>
+                    <th rowspan="2" style="width: 14%">التقدير</th>
+                </tr>
+                {{-- الصف الثاني من الترويسة (التقسيمات الفرعية) --}}
+                <tr>
+                    <th style="width: 12%">أعمال</th>
+                    <th style="width: 12%">امتحان</th>
+                    <th style="width: 12%">أعمال</th>
+                    <th style="width: 12%">امتحان</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($marks as $mark)
                 <tr>
                     <td class="text-end px-3 fw-bold">{{ $mark->subject_name }}</td>
-                    <td>{{ $mark->works_score }}</td>
-                    <td>{{ $mark->final_score }}</td>
-                    <td class="fw-bold bg-light">{{ $mark->total_score }}</td>
-                    <td>
-                        @if($mark->total_score >= 85) ممتاز
-                        @elseif($mark->total_score >= 75) جيد جداً
-                        @elseif($mark->total_score >= 65) جيد
-                        @elseif($mark->total_score >= 50) مقبول
-                        @else <span class="text-danger fw-bold">ضعيف</span>
+                    
+                    {{-- درجات الفصل الأول --}}
+                    <td>{{ $mark->works_score_sem1 ?? '-' }}</td>
+                    <td>{{ $mark->final_score_sem1 ?? '-' }}</td>
+                    
+                    {{-- درجات الفصل الثاني --}}
+                    <td>{{ $mark->works_score_sem2 ?? '-' }}</td>
+                    <td>{{ $mark->final_score_sem2 ?? '-' }}</td>
+                    
+                    {{-- المجموع والتقدير --}}
+                    <td class="fw-bold bg-light fs-6">{{ $mark->total_score ?? 0 }}</td>
+                    <td class="fw-bold">
+                        @if(($mark->total_score ?? 0) >= 85) <span class="text-success">ممتاز</span>
+                        @elseif(($mark->total_score ?? 0) >= 75) جيد جداً
+                        @elseif(($mark->total_score ?? 0) >= 65) جيد
+                        @elseif(($mark->total_score ?? 0) >= 50) مقبول
+                        @else <span class="text-danger">ضعيف</span>
                         @endif
                     </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="5" class="py-5 text-muted">لم يتم رصد درجات لهذا الطالب بعد.</td>
+                    <td colspan="7" class="py-5 text-muted">لم يتم رصد درجات لهذا الطالب بعد.</td>
                 </tr>
                 @endforelse
             </tbody>
+            
             {{-- صف المجموع النهائي --}}
             @if(count($marks) > 0)
             <tfoot class="fw-bold" style="border-top: 3px double #000;">
                 <tr>
-                    <td colspan="3" class="text-end px-3">المجموع النهائي</td>
+                    {{-- تم تغيير colspan إلى 5 ليتناسب مع عدد الأعمدة الجديد --}}
+                    <td colspan="5" class="text-end px-3 fs-5">المجموع الكلي للدرجات</td>
                     <td class="bg-light fs-5">{{ $totalSum }}</td>
-                    <td>{{ number_format($percentage, 1) }}%</td>
+                    <td class="fs-5">{{ number_format($percentage, 1) }}%</td>
                 </tr>
             </tfoot>
             @endif

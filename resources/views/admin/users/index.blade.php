@@ -91,14 +91,20 @@
                 </thead>
                 <tbody>
                     @forelse($users as $user)
-                    <tr>
+                    {{-- تلوين الصف بالأحمر إذا كان المستخدم محظوراً --}}
+                    <tr class="{{ $user->is_banned ? 'table-danger opacity-75' : '' }}">
                         <td class="ps-4 text-muted">{{ $loop->iteration }}</td>
                         <td>
                             <div class="d-flex align-items-center">
                                 <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 35px; height: 35px;">
-                                    {{ strtoupper(substr($user->name, 0, 1)) }}
+                                    {{ strtoupper(mb_substr($user->name, 0, 1)) }}
                                 </div>
-                                <span class="fw-bold">{{ $user->name }}</span>
+                                <div>
+                                    <span class="fw-bold {{ $user->is_banned ? 'text-danger text-decoration-line-through' : '' }}">{{ $user->name }}</span>
+                                    @if($user->is_banned)
+                                        <span class="badge bg-danger ms-1" style="font-size: 0.6rem;">محظور</span>
+                                    @endif
+                                </div>
                             </div>
                         </td>
                         <td class="text-muted small">{{ $user->email }}</td>
@@ -123,32 +129,47 @@
                         <td class="text-muted small">{{ $user->created_at->format('Y-m-d') }}</td>
                         
                         {{-- ========================================== --}}
-                        {{-- 👇 منطقة الإجراءات (تم التعديل هنا) 👇 --}}
+                        {{-- منطقة الإجراءات --}}
                         {{-- ========================================== --}}
                         <td class="text-center">
                             <div class="btn-group" role="group">
+                                
+                                {{-- زر الحظر وإلغاء الحظر --}}
+                                <form action="{{ route('admin.users.toggleBan', $user->id) }}" method="POST" class="d-inline form-ban">
+                                    @csrf
+                                    @if($user->is_banned)
+                                        <button type="button" class="btn btn-sm btn-success text-white btn-ban" data-action="unban" title="إلغاء الحظر وتفعيل الحساب">
+                                            <i class="fas fa-user-check"></i>
+                                        </button>
+                                    @else
+                                        <button type="button" class="btn btn-sm btn-dark btn-ban" data-action="ban" title="حظر وتجميد الحساب">
+                                            <i class="fas fa-ban"></i>
+                                        </button>
+                                    @endif
+                                </form>
+
                                 {{-- زر التعديل --}}
                                 <a href="{{ route('admin.users.edit', $user->id) }}" class="btn btn-sm btn-outline-primary" title="تعديل">
                                     <i class="fas fa-edit"></i>
                                 </a>
+                                
                                 {{-- زر تصفير كلمة المرور --}}
                                 <form action="{{ route('admin.users.resetPassword', $user->id) }}" method="POST" class="d-inline form-reset">
                                     @csrf
-                                    {{-- لاحظ: غيرنا النوع إلى button وأضفنا كلاس btn-reset --}}
                                     <button type="button" class="btn btn-sm btn-outline-warning text-dark btn-reset" title="تصفير كلمة المرور">
                                         <i class="fas fa-key"></i>
                                     </button>
                                 </form>
+                                
                                 {{-- زر الحذف --}}
                                 <form action="{{ route('admin.users.delete', $user->id) }}" method="POST" class="d-inline form-delete">
                                     @csrf 
                                     @method('DELETE')
-                                    
-                                    {{-- لاحظ: أضفنا كلاس btn-delete وغيرنا النوع إلى button --}}
                                     <button type="button" class="btn btn-sm btn-outline-danger btn-delete" title="حذف نهائي">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </form>
+
                             </div>
                         </td>
                         {{-- ========================================== --}}
@@ -193,7 +214,7 @@
                     text: "سيعود الباسورد إلى: 12345678",
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonColor: '#ffc107', // أصفر
+                    confirmButtonColor: '#ffc107',
                     cancelButtonColor: '#6c757d',
                     confirmButtonText: 'نعم، صفرها',
                     cancelButtonText: 'تراجع',
@@ -207,7 +228,39 @@
         });
 
         // ============================================
-        // 2. كود الحذف النهائي (أحمر - جديد 🔴)
+        // 2. كود الحظر وإلغاء الحظر (أسود/أخضر - جديد)
+        // ============================================
+        const banButtons = document.querySelectorAll('.btn-ban');
+        banButtons.forEach(button => {
+            button.addEventListener('click', function (e) {
+                e.preventDefault();
+                const form = this.closest('.form-ban');
+                const action = this.getAttribute('data-action');
+                
+                const titleText = action === 'ban' ? 'حظر المستخدم؟' : 'إلغاء حظر المستخدم؟';
+                const descText = action === 'ban' ? 'لن يتمكن هذا المستخدم من الدخول إلى حسابه في النظام.' : 'سيتم تفعيل حساب هذا المستخدم ليتمكن من الدخول مجدداً.';
+                const confirmColor = action === 'ban' ? '#212529' : '#198754';
+                const confirmBtnText = action === 'ban' ? 'نعم، قم بالحظر' : 'نعم، ألغِ الحظر';
+
+                Swal.fire({
+                    title: titleText,
+                    text: descText,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: confirmColor,
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: confirmBtnText,
+                    cancelButtonText: 'تراجع'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        form.submit();
+                    }
+                });
+            });
+        });
+
+        // ============================================
+        // 3. كود الحذف النهائي (أحمر)
         // ============================================
         const deleteButtons = document.querySelectorAll('.btn-delete');
         deleteButtons.forEach(button => {
@@ -218,10 +271,10 @@
                 Swal.fire({
                     title: 'هل أنت متأكد؟',
                     text: "لا يمكن التراجع عن هذا الإجراء! سيتم حذف المستخدم وجميع بياناته.",
-                    icon: 'error', // أيقونة الخطأ حمراء
+                    icon: 'error',
                     showCancelButton: true,
-                    confirmButtonColor: '#d33', // أحمر غامق
-                    cancelButtonColor: '#3085d6', // أزرق للإلغاء
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
                     confirmButtonText: 'نعم، احذفه!',
                     cancelButtonText: 'تراجع'
                 }).then((result) => {

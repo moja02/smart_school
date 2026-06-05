@@ -4,14 +4,14 @@
 <div class="card page-header-card mb-4 shadow border-0 no-print">
     <div class="card-body">
         <h2 class="fw-bold mb-1 text-white">مركز التقارير والإحصائيات 📊</h2>
-        <p class="text-white-50 mb-0">لوحة التحكم لاستخراج كشوفات الدرجات وتقارير الأوائل.</p>
+        <p class="text-white-50 mb-0">لوحة التحكم لاستخراج كشوفات الدرجات وتقارير الأوائل والنواقص.</p>
     </div>
 </div>
 
-
 {{-- 1. بطاقات اختيار نوع التقرير --}}
 <div class="row g-4 mb-5 no-print">
-    <div class="col-md-6">
+    {{-- كرت أوائل الصفوف --}}
+    <div class="col-md-4">
         <a href="{{ route('admin.reports.index', ['type' => 'top_students']) }}" class="text-decoration-none">
             <div class="card h-100 border-0 shadow-sm hover-shadow transition {{ request('type') == 'top_students' ? 'border-start border-primary border-4' : '' }}">
                 <div class="card-body text-center p-4">
@@ -25,7 +25,8 @@
         </a>
     </div>
 
-    <div class="col-md-6">
+    {{-- كرت شهادات الطلاب --}}
+    <div class="col-md-4">
         <a href="{{ route('admin.reports.index', ['type' => 'certificates']) }}" class="text-decoration-none">
             <div class="card h-100 border-0 shadow-sm hover-shadow transition {{ request('type') == 'certificates' ? 'border-start border-success border-4' : '' }}">
                 <div class="card-body text-center p-4">
@@ -34,6 +35,21 @@
                     </div>
                     <h5 class="fw-bold text-dark">شهادات الطلاب</h5>
                     <p class="small text-muted">طباعة كشف درجات تفصيلي لكل طالب.</p>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    {{-- كرت نواقص الإسناد (الجديد) --}}
+    <div class="col-md-4">
+        <a href="{{ route('admin.reports.index', ['type' => 'missing_teachers']) }}" class="text-decoration-none">
+            <div class="card h-100 border-0 shadow-sm hover-shadow transition {{ request('type') == 'missing_teachers' ? 'border-start border-danger border-4' : '' }}">
+                <div class="card-body text-center p-4">
+                    <div class="icon-box bg-danger bg-opacity-10 text-danger rounded-circle mx-auto mb-3" style="width: 60px; height: 60px; line-height: 60px;">
+                        <i class="fas fa-exclamation-triangle fa-2x"></i>
+                    </div>
+                    <h5 class="fw-bold text-dark">نواقص الإسناد</h5>
+                    <p class="small text-muted">اكتشاف الفصول والمواد بدون أساتذة.</p>
                 </div>
             </div>
         </a>
@@ -186,6 +202,72 @@
         @else
             <div class="card-body text-center py-5">
                 <p class="text-muted">يرجى اختيار الصف لعرض قائمة الطلاب.</p>
+            </div>
+        @endif
+    </div>
+
+{{-- ثالثاً: قسم تقرير النواقص (الجديد) --}}
+@elseif(request('type') == 'missing_teachers')
+    <div class="card shadow border-0 mb-4 animate__animated animate__fadeIn">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 fw-bold"><i class="fas fa-exclamation-triangle me-2 text-danger"></i> تقرير النواقص (مواد بدون أساتذة)</h5>
+            
+            <div class="d-flex gap-2 align-items-center">
+                <form action="{{ route('admin.reports.index') }}" method="GET" class="d-flex gap-2 m-0">
+                    <input type="hidden" name="type" value="missing_teachers">
+                    <select name="grade_id" class="form-select shadow-sm border-danger" onchange="this.form.submit()" style="min-width: 200px;">
+                        <option value="">-- اختر الصف الدراسي --</option>
+                        @foreach($grades as $grade)
+                            <option value="{{ $grade->id }}" {{ request('grade_id') == $grade->id ? 'selected' : '' }}>{{ $grade->name }}</option>
+                        @endforeach
+                    </select>
+                </form>
+            </div>
+        </div>
+
+        @if(isset($missingAssignments) && $missingAssignments->count() > 0)
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle text-center mb-0">
+                        <thead class="bg-light text-muted">
+                            <tr>
+                                <th width="20%">الفصل / الشعبة</th>
+                                <th width="60%" class="text-start ps-4">المواد التي تحتاج إلى إسناد</th>
+                                <th width="20%">الإجراء</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($missingAssignments as $item)
+                            <tr>
+                                <td class="fw-bold text-dark fs-6">{{ $item->class->name ?? $item->class->section }}</td>
+                                <td class="text-start ps-4">
+                                    @foreach($item->missing_subjects as $subject)
+                                        <span class="badge bg-warning text-dark border border-warning fs-6 mb-1 me-1 shadow-sm">
+                                            <i class="fas fa-book-open me-1"></i> {{ $subject->name }}
+                                        </span>
+                                    @endforeach
+                                </td>
+                                <td>
+                                    {{-- توجيه الإداري لصفحة الإسناد مع تحديد الصف تلقائياً --}}
+                                    <a href="{{ route('admin.assign') }}?grade_id={{ request('grade_id') }}" class="btn btn-sm btn-outline-danger rounded-pill fw-bold px-3">
+                                        <i class="fas fa-link me-1"></i> إسناد الآن
+                                    </a>
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @elseif(request('grade_id'))
+            <div class="card-body text-center py-5">
+                <i class="fas fa-check-circle fa-4x text-success mb-3 opacity-50"></i>
+                <h4 class="text-success fw-bold">الوضع ممتاز!</h4>
+                <p class="text-muted">تم إسناد جميع المواد لمعلمين في جميع فصول هذا الصف.</p>
+            </div>
+        @else
+            <div class="card-body text-center py-5">
+                <p class="text-muted">يرجى اختيار الصف لعرض النواقص والفجوات.</p>
             </div>
         @endif
     </div>
