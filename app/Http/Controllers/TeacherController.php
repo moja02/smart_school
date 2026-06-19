@@ -1057,8 +1057,8 @@ public function storeExam(Request $request)
     $request->validate([
         'title' => 'required|string|max:100',
         'exam_date' => 'required|date',
-        'subject_id' => 'required',
-        'class_id' => 'required',
+        'subject_id' => 'required|exists:subjects,id',
+        'class_id' => 'required|exists:classes,id',
     ]);
 
     ExamSchedule::create([
@@ -1074,7 +1074,10 @@ public function storeExam(Request $request)
 // تحديث الامتحان
 public function updateExam(Request $request)
 {
-    $request->validate(['exam_id' => 'required', 'title' => 'required']);
+    $request->validate([
+        'exam_id' => 'required|exists:exam_schedules,id',
+        'title' => 'required|string|max:100'
+    ]);
     
     $exam = \App\Models\ExamSchedule::where('id', $request->exam_id)
                 ->where('teacher_id', auth()->id()) // أمان: التأكد أنه صاحب الامتحان

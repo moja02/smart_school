@@ -288,7 +288,7 @@ class ParentController extends Controller
             'student_id' => 'required|exists:student_profiles,id',
             'type' => 'required|in:absence,early_leave',
             'leave_date' => 'required|date',
-            'reason' => 'required|string',
+            'reason' => 'required|string|max:500',
         ]);
 
         LeaveRequest::create([
@@ -393,8 +393,8 @@ class ParentController extends Controller
         if ($request->isMethod('post')) {
             // إضافة معالجة بسيطة في حالة الإرسال لتجنب الأخطاء
             $request->validate([
-                'subject' => 'required|string',
-                'body' => 'required|string'
+                'subject' => 'required|string|max:255',
+                'body' => 'required|string|max:1000'
             ]);
 
             \App\Models\Message::create([

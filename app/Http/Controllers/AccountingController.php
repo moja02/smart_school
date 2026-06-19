@@ -18,8 +18,8 @@ class AccountingController extends Controller
     public function storeExpense(Request $request)
     {
         $request->validate([
-            'title' => 'required|string',
-            'category' => 'required|string',
+            'title' => 'required|string|max:255',
+            'category' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0.1',
             'expense_date' => 'required|date',
         ]);
