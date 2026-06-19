@@ -7,22 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class Grade extends Model
 {
 
-    // تعريف الحقول القابلة للتعديل (fillable)
-    protected $fillable = [
-        'student_id',   // الطالب الذي حصل على هذه الدرجة
-        'subject_id',   // المادة الدراسية
-        'total_score',  // الدرجة التي حصل عليها الطالب
-        'max_score',    // الحد الأقصى للدرجة
-    ];
-
-    /**
-     * العلاقة بين الـ Grade و StudentProfile
-     * حيث أن كل درجة تخص طالب معين
-     */
-    public function student()
-    {
-        return $this->belongsTo(StudentProfile::class, 'student_id');
-    }
+    // $guarded is used below, removing incorrect $fillable
 
     /**
      * العلاقة بين الـ Grade و Subject
@@ -35,12 +20,6 @@ class Grade extends Model
 
     use HasFactory;
     protected $guarded = [];
-
-    // علاقة الدرجة بالطالب
-    public function studentProfile()
-    {
-        return $this->belongsTo(StudentProfile::class, 'student_id');
-    }
 
     // العلاقة مع الفصول (اختياري الآن)
     public function classes()

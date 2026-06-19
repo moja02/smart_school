@@ -30,6 +30,7 @@ class User extends Authenticatable
         'phone',       
         'address',     
         'birth_date',
+        'is_banned',
     ];
 
     protected $hidden = [
@@ -139,17 +140,23 @@ class User extends Authenticatable
             'class_id'               // المفتاح في البروفايل الذي يربطه بالفصل
         );
     }
-    // داخل كلاس User
     public function schoolClass()
     {
-        // الطالب ينتمي إلى شعبة واحدة (التي جدولها هو classes)
-        return $this->belongsTo(SchoolClass::class, 'class_id'); 
+        // الطالب ينتمي إلى شعبة واحدة عبر البروفايل
+        return $this->hasOneThrough(
+            SchoolClass::class,
+            StudentProfile::class,
+            'user_id',
+            'id',
+            'id',
+            'class_id'
+        );
     }
 
     
     public function schedules()
     {
-        return $this->hasMany(Schedule::class, 'teacher_id');
+        return $this->hasMany(Schedule::class, 'teacher_id')->where('is_backup', 0);
     }
     
     public function preferences()

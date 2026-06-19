@@ -6,6 +6,8 @@ class Question extends Model {
     protected $guarded = []; // السماح بالحفظ
     protected $casts = ['options' => 'array']; // تحويل الخيارات تلقائياً
     protected $fillable = [
+    'subject_id',
+    'section_id',
     'lesson_id', 
     'content', 
     'type', 

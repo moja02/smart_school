@@ -418,6 +418,48 @@ class TeacherController extends Controller
         return back()->with('success', 'تم حذف السؤال من بنك الأسئلة بنجاح.');
     }
 
+    public function storeHomework(Request $request)
+    {
+        $request->validate([
+            'subject_id' => 'required',
+            'class_id' => 'required',
+            'title' => 'required|string',
+            'description' => 'nullable|string',
+            'due_date' => 'required|date',
+        ]);
+
+        \App\Models\Homework::create([
+            'teacher_id' => Auth::id(),
+            'subject_id' => $request->subject_id,
+            'class_id' => $request->class_id,
+            'title' => $request->title,
+            'description' => $request->description,
+            'due_date' => $request->due_date,
+        ]);
+
+        return back()->with('success', 'تم إضافة الواجب بنجاح.');
+    }
+
+    public function destroyHomework($id)
+    {
+        \App\Models\Homework::where('id', $id)->where('teacher_id', Auth::id())->delete();
+        return back()->with('success', 'تم حذف الواجب بنجاح.');
+    }
+
+    public function homeworks($subject_id, $section_id)
+    {
+        $subject = \App\Models\Subject::findOrFail($subject_id);
+        $class = \App\Models\SchoolClass::findOrFail($section_id);
+        
+        $homeworks = \App\Models\Homework::where('teacher_id', Auth::id())
+            ->where('subject_id', $subject_id)
+            ->where('class_id', $section_id)
+            ->orderBy('due_date', 'desc')
+            ->get();
+            
+        return view('teacher.homeworks.index', compact('subject', 'class', 'homeworks'));
+    }
+
     // 2. التقييمات (محدثة بالاعتماد على دالة المودل)
     // ==========================================
     // 💡 إدارة التقييمات الذكية (Assessments)
@@ -1065,5 +1107,81 @@ public function myWeeklySchedule()
         $periods = [1, 2, 3, 4, 5, 6, 7]; // افترضنا 7 حصص، يمكنك تعديلها حسب مدرستك
 
         return view('teacher.schedule.weekly', compact('teacher', 'days', 'periods'));
+    }
+
+    // ==========================================
+    // الاختبارات الإلكترونية (Online Exams)
+    // ==========================================
+
+    public function onlineExamsIndex()
+    {
+        $teacherId = auth()->user()->id;
+        $exams = \App\Models\OnlineExam::with(['subject', 'class'])
+                    ->where('teacher_id', $teacherId)
+                    ->orderBy('created_at', 'desc')->get();
+                    
+        $subjects = \App\Models\Subject::where('school_id', auth()->user()->school_id)->get();
+        $classes = \App\Models\SchoolClass::where('school_id', auth()->user()->school_id)->get();
+
+        return view('teacher.exams.index', compact('exams', 'subjects', 'classes'));
+    }
+
+    public function storeOnlineExam(Request $request)
+    {
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'subject_id' => 'required|exists:subjects,id',
+            'class_id' => 'required|exists:classes,id',
+            'duration_minutes' => 'required|integer|min:5',
+        ]);
+
+        \App\Models\OnlineExam::create([
+            'school_id' => auth()->user()->school_id,
+            'teacher_id' => auth()->user()->id,
+            'subject_id' => $request->subject_id,
+            'class_id' => $request->class_id,
+            'title' => $request->title,
+            'description' => $request->description,
+            'duration_minutes' => $request->duration_minutes,
+            'is_active' => true,
+        ]);
+
+        return redirect()->back()->with('success', 'تم إنشاء الاختبار بنجاح.');
+    }
+
+    public function showOnlineExam($id)
+    {
+        $exam = \App\Models\OnlineExam::with('questions')->where('teacher_id', auth()->user()->id)->findOrFail($id);
+        return view('teacher.exams.show', compact('exam'));
+    }
+
+    public function storeOnlineExamQuestion(Request $request, $id)
+    {
+        $request->validate([
+            'question_text' => 'required|string',
+            'correct_answer' => 'required|string',
+            'score' => 'required|integer|min:1',
+            'option_1' => 'required|string',
+            'option_2' => 'required|string',
+        ]);
+
+        $exam = \App\Models\OnlineExam::where('teacher_id', auth()->user()->id)->findOrFail($id);
+
+        $options = [
+            $request->option_1,
+            $request->option_2,
+        ];
+        if ($request->filled('option_3')) $options[] = $request->option_3;
+        if ($request->filled('option_4')) $options[] = $request->option_4;
+
+        \App\Models\OnlineExamQuestion::create([
+            'online_exam_id' => $exam->id,
+            'question_text' => $request->question_text,
+            'options' => $options,
+            'correct_answer' => $request->correct_answer,
+            'score' => $request->score,
+        ]);
+
+        return redirect()->back()->with('success', 'تمت إضافة السؤال بنجاح.');
     }
 }

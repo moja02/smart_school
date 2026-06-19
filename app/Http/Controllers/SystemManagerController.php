@@ -40,7 +40,7 @@ class SystemManagerController extends Controller
         $school = School::findOrFail($school_id);
         
         // ✅ التعديل هنا: جلب الرتب الأربعة المحددة فقط بدلاً من جلب كل شيء
-        $allowedRoles = ['admin', 'teacher', 'student', 'parent'];
+        $allowedRoles = ['manager', 'admin', 'teacher', 'student', 'parent'];
         $roles = Role::whereIn('name', $allowedRoles)->get();
 
         return view('system.users.create', compact('school', 'roles'));
@@ -54,7 +54,7 @@ class SystemManagerController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
-            'role' => 'required|in:admin,teacher,student,parent', 
+            'role' => 'required|in:manager,admin,teacher,student,parent', 
         ]);
 
         $user = User::create([
@@ -70,7 +70,8 @@ class SystemManagerController extends Controller
 
         // ترجمة الرتبة لطباعتها في رسالة النجاح
         $roleNameAr = match($request->role) {
-            'admin' => 'مدير مدرسة',
+            'manager' => 'مدير مدرسة',
+            'admin' => 'مسؤول دراسة',
             'teacher' => 'أستاذ',
             'student' => 'طالب',
             'parent' => 'ولي أمر',

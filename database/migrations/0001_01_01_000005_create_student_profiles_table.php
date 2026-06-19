@@ -26,10 +26,10 @@ return new class extends Migration {
             // تأكد أن اسم الجدول هنا صحيح (classes أو school_classes حسب تسميتك السابقة)
             $table->foreignId('class_id')->nullable()->constrained('classes')->onDelete('set null');
 
-            // ✅ أضف هذه الأعمدة الثلاثة الناقصة
-            $table->string('phone')->nullable();
-            $table->text('address')->nullable();
-            $table->date('birth_date')->nullable();
+            $table->decimal('total_fees', 10, 2)->default(0);
+            $table->decimal('paid_fees', 10, 2)->default(0);
+            $table->decimal('wallet_balance', 10, 2)->default(0);
+            $table->decimal('daily_limit', 10, 2)->nullable()->comment('الحد اليومي للمصروفات في المقصف (NULL يعني بدون حد)');
 
             $table->timestamps();
         });

@@ -24,12 +24,14 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('subject_id')->index(); // المادة
             $table->unsignedBigInteger('lesson_id')->nullable()->index(); // الدرس (يمكن أن يكون فارغاً)
+            $table->unsignedBigInteger('section_id')->nullable()->index(); // الشعبة
             
             $table->enum('type', ['true_false', 'multiple_choice']); // نوع السؤال
             $table->text('content'); // نص السؤال
             $table->json('options')->nullable(); // الخيارات (للاختيار من متعدد) - مهم جداً يكون json
             $table->string('correct_answer'); // الإجابة الصحيحة
             $table->text('feedback')->nullable(); // ملاحظة للطالب
+            $table->integer('score')->default(1); // درجة السؤال
             $table->timestamps();
         });
 
@@ -37,10 +39,12 @@ return new class extends Migration
         Schema::create('assessments', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('subject_id')->index(); // المادة
+            $table->unsignedBigInteger('section_id')->nullable()->index(); // الشعبة
             $table->unsignedBigInteger('teacher_id')->index(); // المعلم الذي وضع التقييم
             
-            $table->string('title'); // عنوان التقييم (اختبار شهر أول، واجب..)
+            $table->string('name'); // عنوان التقييم (اختبار شهر أول، واجب..)
             $table->integer('max_score'); // الدرجة العظمى
+            $table->tinyInteger('semester')->nullable(); // الفصل الدراسي
             $table->timestamps();
         });
 

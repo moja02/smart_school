@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\DB;
 use App\Models\TeacherPreference; // إضافة من الكود الثاني
 use App\Models\Schedule;          // إضافة من الكود الثاني
 use Illuminate\Support\Facades\Storage; // إضافة من الكود الثاني
+use App\Models\LeaveRequest;
+use App\Models\WalletTransaction;
 
 class AdminController extends Controller
 {
@@ -31,10 +33,52 @@ class AdminController extends Controller
 
         $totalStudents = User::role('student')->where('school_id', $schoolId)->count();
         $totalTeachers = User::role('teacher')->where('school_id', $schoolId)->count();
+        $totalParents  = User::role('parent')->where('school_id', $schoolId)->count();
         $classes = SchoolClass::where('school_id', $schoolId)->count();
         
-        // ✅ التصحيح هنا: أضفنا admin. قبل اسم الملف
-        return view('admin.dashboard', compact('totalStudents', 'totalTeachers', 'classes'));
+        // --- 📊 Analytics Data Preparation ---
+        
+        // 1. Revenue & Expenses over the last 6 months
+        $months = [];
+        $revenueData = [];
+        $expenseData = [];
+        
+        for ($i = 5; $i >= 0; $i--) {
+            $date = now()->subMonths($i);
+            $months[] = $date->translatedFormat('F Y'); // e.g., "June 2026"
+            
+            // Revenue for this month (Assuming FeePayment model exists, joining with students to filter by school_id)
+            $revenue = \App\Models\FeePayment::whereMonth('payment_date', $date->month)
+                ->whereYear('payment_date', $date->year)
+                ->whereHas('student', function($q) use ($schoolId) {
+                    // student relationship points to student_profiles, which belongs to a user
+                    $q->whereHas('user', function($q2) use ($schoolId) {
+                        $q2->where('school_id', $schoolId);
+                    });
+                })->sum('amount');
+                
+            $revenueData[] = (float) $revenue;
+            
+            // Expenses for this month
+            $expense = \App\Models\Expense::where('school_id', $schoolId)
+                ->whereMonth('expense_date', $date->month)
+                ->whereYear('expense_date', $date->year)
+                ->sum('amount');
+                
+            $expenseData[] = (float) $expense;
+        }
+
+        // 2. User Demographics Data (Pie Chart)
+        $usersDemographics = [
+            'الطلاب' => $totalStudents,
+            'المعلمون' => $totalTeachers,
+            'أولياء الأمور' => $totalParents
+        ];
+        
+        return view('admin.dashboard', compact(
+            'totalStudents', 'totalTeachers', 'totalParents', 'classes',
+            'months', 'revenueData', 'expenseData', 'usersDemographics'
+        ));
     }
 
     // 1. عرض صفحة اختيار المراحل
@@ -327,7 +371,6 @@ public function updateUser(Request $request, $id)
 
         Grade::create([
             'name' => $request->name,
-            'notes' => $request->notes,
             // يمكن إضافة school_id هنا إذا كانت المراحل تختلف من مدرسة لأخرى
             'school_id' => auth()->user()->school_id, 
         ]);
@@ -1310,7 +1353,11 @@ public function updateSubject(Request $request)
         // 4. تم إضافة الحصة السابعة هنا لكي تظهر جميع الحصص التي يولدها الذكاء الاصطناعي
         $periods = [1, 2, 3, 4, 5, 6];
 
-        return view('admin.schedules.index', compact('classes', 'teachers', 'days', 'periods'));
+        // 5. التحقق من وجود جدول احتياطي
+        $schoolClassIds = \App\Models\SchoolClass::where('school_id', $schoolId)->pluck('id');
+        $hasBackup = \App\Models\Schedule::whereIn('class_id', $schoolClassIds)->where('is_backup', 1)->exists();
+
+        return view('admin.schedules.index', compact('classes', 'teachers', 'days', 'periods', 'hasBackup'));
     }
 
     /**
@@ -1445,6 +1492,7 @@ public function updateSubject(Request $request)
             
             // كتابة بيانات جديدة ونظيفة
             file_put_contents($jsonPath, json_encode($inputData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+            file_put_contents(base_path('input_debug.json'), json_encode($inputData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 
             // 4. تشغيل الخوارزمية (البايثون)
             $pythonPath = base_path('scheduler.py');
@@ -1456,9 +1504,14 @@ public function updateSubject(Request $request)
                 
                 if (isset($resultData['schedule']) && !empty($resultData['schedule'])) {
                     
-                    // إيقاف مؤقت للقيود لضمان الحفظ المريح بدون أخطاء MySQL
-                    \Illuminate\Support\Facades\Schema::disableForeignKeyConstraints();
-                    \App\Models\Schedule::truncate(); 
+                    // أخذ نسخة احتياطية للجدول القديم (Revert Logic)
+                    $schoolClassIds = \App\Models\SchoolClass::where('school_id', $schoolId)->pluck('id');
+                    
+                    // 1. مسح أي نسخة احتياطية قديمة جداً
+                    \App\Models\Schedule::whereIn('class_id', $schoolClassIds)->where('is_backup', 1)->delete();
+                    
+                    // 2. تحويل الجدول الحالي لنسخة احتياطية
+                    \App\Models\Schedule::whereIn('class_id', $schoolClassIds)->where('is_backup', 0)->update(['is_backup' => 1]);
 
                     $successCount = 0;
                     foreach ($resultData['schedule'] as $item) {
@@ -1472,13 +1525,12 @@ public function updateSubject(Request $request)
                             ]);
                             $successCount++;
                         } catch (\Throwable $e) {
+                            \Log::error("Schedule generation failed for item: " . json_encode($item) . " Error: " . $e->getMessage());
                             // تجاهل أي خطأ فردي لتمرير باقي الجدول
                             continue; 
                         }
                     }
                     
-                    // إعادة تفعيل القيود
-                    \Illuminate\Support\Facades\Schema::enableForeignKeyConstraints();
 
                     if ($successCount > 0) {
                         return redirect()->back()->with('success', "تم التوليد بنجاح! 🚀 ($successCount حصة تم حفظها)");
@@ -1683,14 +1735,20 @@ $assessments = \App\Models\Assessment::where('subject_id', $selectedSubject)
 
         // تعريف الصلاحيات المتاحة في النظام باللغة العربية
         $availablePermissions = [
-            'manage_users'     => 'إدارة المستخدمين (طلاب ومعلمين)',
-            'manage_classes'   => 'إدارة الفصول والشعب',
-            'manage_subjects'  => 'إدارة المواد وتوزيع الدرجات',
-            'assign_teachers'  => 'إسناد المواد للمعلمين',
-            'manage_schedules' => 'إدارة الجدول الدراسي',
-            'edit_marks'       => 'تعديل درجات الطلاب',
-            'manage_reports'   => 'إصدار التقارير والشهادات',
-            'toggle_grading'   => 'فتح وإغلاق الرصد', // الصلاحية التي طلبتها
+            'manage_users'      => 'إدارة المستخدمين (طلاب ومعلمين)',
+            'manage_classes'    => 'إدارة الفصول والشعب',
+            'manage_subjects'   => 'إدارة المواد وتوزيع الدرجات',
+            'assign_teachers'   => 'إسناد المواد للمعلمين',
+            'manage_schedules'  => 'إدارة الجدول الدراسي',
+            'edit_marks'        => 'تعديل درجات الطلاب',
+            'manage_reports'    => 'إصدار التقارير والشهادات',
+            'toggle_grading'    => 'فتح وإغلاق الرصد',
+            'manage_wallet_charge' => 'شحن المحفظة (الإدارة المالية)',
+            'manage_wallet_sell'   => 'خصم من المحفظة (المبيعات والمقصف)',
+            'manage_fees'       => 'إدارة الرسوم الدراسية',
+            'manage_leaves'     => 'إدارة طلبات الاستئذان',
+            'manage_admissions' => 'إدارة طلبات القبول والتسجيل',
+            'manage_promotion'  => 'الترحيل ونهاية السنة الدراسية',
         ];
 
         // التأكد من تسجيل هذه الصلاحيات في قاعدة بيانات Spatie لتجنب الأخطاء
@@ -2284,11 +2342,273 @@ $assessments = \App\Models\Assessment::where('subject_id', $selectedSubject)
                     ]);
                 }
                 
-                // (اختياري: يمكن تفريغ أو أرشفة الدرجات من student_scores و assessment_marks للطالب هنا للعام القادم)
+                // ✅ تنظيف الدرجات القديمة للطالب بعد الأرشفة
+                \DB::table('student_scores')->where('student_id', $data['id'])->delete();
+                \DB::table('assessment_marks')
+                    ->whereIn('assessment_id', function($q) use ($data) {
+                        $q->select('id')->from('assessments')
+                          ->where('section_id', $data['old_class_id']);
+                    })
+                    ->where('student_id', $data['id'])
+                    ->delete();
             }
         });
 
-        return response()->json(['success' => true, 'message' => 'تم تنفيذ الترحيل بنجاح وأرشفة النتائج.']);
+        return response()->json(['success' => true, 'message' => 'تم تنفيذ الترحيل بنجاح وأرشفة النتائج وتنظيف الدرجات القديمة.']);
+    }
+
+    // ==========================================
+    // 🏫 إغلاق السنة الدراسية بالكامل
+    // ==========================================
+
+    /**
+     * عرض صفحة إغلاق السنة الدراسية
+     */
+    public function showCloseYear()
+    {
+        $schoolId = auth()->user()->school_id;
+        $school = \App\Models\School::find($schoolId);
+        
+        // إحصائيات للعرض
+        $stats = [
+            'students_count' => \App\Models\User::role('student')->where('school_id', $schoolId)->count(),
+            'scores_count' => \DB::table('student_scores')
+                ->whereIn('student_id', \App\Models\User::where('school_id', $schoolId)->pluck('id'))
+                ->count(),
+            'assessments_count' => \App\Models\Assessment::whereIn('section_id', 
+                \App\Models\SchoolClass::where('school_id', $schoolId)->pluck('id')
+            )->count(),
+            'schedules_count' => \App\Models\Schedule::whereIn('class_id', 
+                \App\Models\SchoolClass::where('school_id', $schoolId)->pluck('id')
+            )->count(),
+            'attendance_count' => \App\Models\Attendance::whereIn('class_id', 
+                \App\Models\SchoolClass::where('school_id', $schoolId)->pluck('id')
+            )->count(),
+            'promotions_done' => \App\Models\PromotionArchive::where('school_id', $schoolId)
+                ->where('academic_year', $school->academic_year ?? '')->count(),
+        ];
+
+        return view('admin.close_year', compact('school', 'stats'));
+    }
+
+    /**
+     * تنفيذ إغلاق السنة الدراسية بالكامل
+     * يقوم بتنظيف جميع البيانات المؤقتة وتجهيز النظام لسنة جديدة
+     */
+    public function executeCloseYear(Request $request)
+    {
+        $request->validate([
+            'new_academic_year' => 'required|string|max:20',
+            'confirm_text' => 'required|in:تأكيد'
+        ]);
+
+        $schoolId = auth()->user()->school_id;
+        $school = \App\Models\School::find($schoolId);
+        $oldYear = $school->academic_year ?? 'غير محدد';
+        $newYear = $request->new_academic_year;
+
+        // التحقق أن جميع الصفوف تمت ترحيتها
+        $grades = \App\Models\Grade::whereIn('id', function($q) use ($schoolId) {
+            $q->select('grade_id')->from('school_grade')->where('school_id', $schoolId);
+        })->get();
+
+        $unpromotedGrades = [];
+        foreach ($grades as $grade) {
+            $studentsInGrade = \App\Models\User::role('student')
+                ->where('school_id', $schoolId)
+                ->whereHas('studentProfile.schoolClass', function($q) use ($grade) {
+                    $q->where('grade_id', $grade->id);
+                })->count();
+
+            if ($studentsInGrade > 0) {
+                $promotedCount = \App\Models\PromotionArchive::where('school_id', $schoolId)
+                    ->where('academic_year', $oldYear)
+                    ->where('old_grade_id', $grade->id)
+                    ->count();
+                
+                if ($promotedCount === 0 && $studentsInGrade > 0) {
+                    $unpromotedGrades[] = $grade->name;
+                }
+            }
+        }
+
+        if (!empty($unpromotedGrades)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'لا يمكن إغلاق السنة! يوجد صفوف لم تتم ترحيتها بعد: ' . implode('، ', $unpromotedGrades)
+            ]);
+        }
+
+        \DB::transaction(function () use ($schoolId, $school, $newYear) {
+            // جلب IDs المدرسة
+            $schoolClassIds = \App\Models\SchoolClass::where('school_id', $schoolId)->pluck('id');
+            $schoolStudentIds = \App\Models\User::where('school_id', $schoolId)->pluck('id');
+
+            // 1. ✅ تنظيف درجات الطلاب (student_scores)
+            \DB::table('student_scores')->whereIn('student_id', $schoolStudentIds)->delete();
+
+            // 2. ✅ تنظيف درجات التقييمات (assessment_marks)
+            $assessmentIds = \App\Models\Assessment::whereIn('section_id', $schoolClassIds)->pluck('id');
+            \DB::table('assessment_marks')->whereIn('assessment_id', $assessmentIds)->delete();
+
+            // 3. ✅ تنظيف التقييمات نفسها (assessments)
+            \App\Models\Assessment::whereIn('section_id', $schoolClassIds)->delete();
+
+            // 4. ✅ تنظيف الجدول الدراسي (schedules)
+            \App\Models\Schedule::whereIn('class_id', $schoolClassIds)->delete();
+
+            // 5. ✅ تنظيف سجلات الحضور والغياب (attendance)
+            \App\Models\Attendance::whereIn('class_id', $schoolClassIds)->delete();
+
+            // 6. ✅ تنظيف إسناد المواد للمعلمين (teacher_subject_section)
+            \DB::table('teacher_subject_section')->where('school_id', $schoolId)->delete();
+
+            // 7. ✅ تنظيف محاولات الاختبارات الذاتية (quiz_attempts)
+            \DB::table('quiz_attempts')->whereIn('student_id', 
+                \App\Models\StudentProfile::whereIn('user_id', $schoolStudentIds)->pluck('id')
+            )->delete();
+
+            // 8. ✅ تحديث السنة الدراسية
+            $school->academic_year = $newYear;
+            $school->grading_locked = false; // فتح الرصد للسنة الجديدة
+            $school->save();
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => "تم إغلاق السنة الدراسية بنجاح! 🎓\nتم تنظيف جميع البيانات المؤقتة وتحديث السنة إلى: $newYear\nالنظام جاهز للسنة الجديدة."
+        ]);
+    }
+
+    // ==========================================
+    // البحث الشامل (Global Search)
+    // ==========================================
+    public function globalSearch(Request $request)
+    {
+        $query = $request->input('q');
+        if (strlen($query) < 2) {
+            return response()->json([]);
+        }
+
+        $schoolId = auth()->user()->school_id;
+
+        $users = User::where('school_id', $schoolId)
+            ->where('name', 'LIKE', "%{$query}%")
+            ->select('id', 'name', 'role')
+            ->take(10)
+            ->get();
+
+        return response()->json($users);
+    }
+
+    public function admissionsIndex()
+    {
+        $admissions = \App\Models\Admission::all();
+        return view('admin.admissions.index', compact('admissions')); // placeholder
+    }
+
+    public function updateAdmissionStatus(Request $request, $id)
+    {
+        $admission = \App\Models\Admission::findOrFail($id);
+        $admission->status = $request->status;
+        $admission->save();
+        return redirect()->back()->with('success', 'تم التحديث');
+    }
+
+    public function leavesIndex()
+    {
+        $leaves = \App\Models\LeaveRequest::with('student')->get();
+        return view('admin.leaves.index', compact('leaves'));
+    }
+
+    public function updateLeaveStatus(Request $request, $id)
+    {
+        $leave = \App\Models\LeaveRequest::findOrFail($id);
+        $leave->status = $request->status;
+        $leave->save();
+        return back()->with('success', 'تم التحديث');
+    }
+
+    public function walletIndex(Request $request)
+    {
+        $user = auth()->user();
+        if ($user->role !== 'manager' && !$user->hasPermissionTo('manage_wallet_charge') && !$user->hasPermissionTo('manage_wallet_sell')) {
+            abort(403, 'ليس لديك صلاحية الوصول لهذه الصفحة.');
+        }
+
+        $search = $request->search;
+        $students = \App\Models\User::role('student')
+            ->when($search, function($query, $search) {
+                return $query->where('name', 'like', "%{$search}%");
+            })
+            ->with('studentProfile')->get();
+        return view('admin.wallet.index', compact('students'));
+    }
+
+    public function topupWallet(Request $request)
+    {
+        $user = auth()->user();
+        if ($user->role !== 'manager' && !$user->hasPermissionTo('manage_wallet_charge')) {
+            abort(403, 'ليس لديك صلاحية شحن المحفظة.');
+        }
+
+        $request->validate([
+            'student_id' => 'required|exists:student_profiles,id',
+            'amount' => 'required|numeric|min:0.5'
+        ]);
+        $studentProfile = \App\Models\StudentProfile::findOrFail($request->student_id);
+        $studentProfile->wallet_balance = ($studentProfile->wallet_balance ?? 0) + $request->amount;
+        $studentProfile->save();
+        return back()->with('success', 'تم شحن المحفظة');
+    }
+
+    public function purchaseWallet(Request $request)
+    {
+        $user = auth()->user();
+        if ($user->role !== 'manager' && !$user->hasPermissionTo('manage_wallet_sell')) {
+            abort(403, 'ليس لديك صلاحية البيع من المقصف.');
+        }
+
+        $request->validate([
+            'student_id' => 'required|exists:student_profiles,id',
+            'amount' => 'required|numeric|min:0.5'
+        ]);
+        $studentProfile = \App\Models\StudentProfile::findOrFail($request->student_id);
+        if (($studentProfile->wallet_balance ?? 0) >= $request->amount) {
+            $studentProfile->wallet_balance -= $request->amount;
+            $studentProfile->save();
+            return back()->with('success', 'تم الخصم');
+        }
+        return back()->with('error', 'الرصيد غير كافٍ');
+    }
+
+    // ==========================================
+    // 🔙 تراجع واعتماد الجداول (Revert & Confirm Schedules)
+    // ==========================================
+
+    public function revertSchedule()
+    {
+        $schoolId = auth()->user()->school_id;
+        $schoolClassIds = \App\Models\SchoolClass::where('school_id', $schoolId)->pluck('id');
+
+        // 1. حذف الجدول الجديد الخاطئ
+        \App\Models\Schedule::whereIn('class_id', $schoolClassIds)->where('is_backup', 0)->delete();
+        
+        // 2. إرجاع الجدول القديم ليصبح هو الأساسي
+        \App\Models\Schedule::whereIn('class_id', $schoolClassIds)->where('is_backup', 1)->update(['is_backup' => 0]);
+
+        return back()->with('success', 'تم التراجع بنجاح! عاد الجدول القديم للعمل ⏪');
+    }
+
+    public function confirmSchedule()
+    {
+        $schoolId = auth()->user()->school_id;
+        $schoolClassIds = \App\Models\SchoolClass::where('school_id', $schoolId)->pluck('id');
+
+        // حذف الجدول القديم نهائياً لاعتماد الجديد
+        \App\Models\Schedule::whereIn('class_id', $schoolClassIds)->where('is_backup', 1)->delete();
+
+        return back()->with('success', 'تم اعتماد الجدول الجديد وحذف النسخة القديمة نهائياً ✅');
     }
 
 }

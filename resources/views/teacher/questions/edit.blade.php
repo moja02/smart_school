@@ -7,7 +7,7 @@
             <h5 class="mb-0 fw-bold"><i class="fas fa-edit me-2"></i> تعديل السؤال</h5>
         </div>
         <div class="card-body">
-            <form action="{{ route('teacher.question.update', $question->id) }}" method="POST">
+            <form action="{{ route('teacher.questions.update', $question->id) }}" method="POST">
                 @csrf
                 @method('PUT')
 

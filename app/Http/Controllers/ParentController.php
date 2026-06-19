@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use App\Models\User;
 use App\Models\StudentProfile;
+use App\Models\FeePayment;
+use App\Models\Homework;
+use App\Models\LeaveRequest;
+use App\Models\WalletTransaction;
 
 class ParentController extends Controller
 {
@@ -48,7 +52,7 @@ class ParentController extends Controller
 
                     foreach ($assessments as $assessment) {
                         // البحث عن درجة الابن في هذا التقييم بالتحديد
-                        $markRecord = \App\Models\AssessmentMark::where('student_id', $child->id)
+                        $markRecord = \App\Models\AssessmentMark::where('student_id', $child->user_id)
                                                     ->where('assessment_id', $assessment->id)
                                                     ->first();
                         
@@ -84,15 +88,43 @@ class ParentController extends Controller
                 // حساب النسبة المئوية للابن
                 $percentage = $totalMaxScore > 0 ? round(($totalStudentScore / $totalMaxScore) * 100, 1) : 0;
 
-                $childrenDetails[$child->id] = (object)[
+                // 🌟 إضافة بيانات الحضور للرسم البياني 🌟
+                $attendanceStats = [
+                    'present' => \DB::table('attendances')->where('student_id', $child->user_id)->where('status', 'present')->count(),
+                    'absent'  => \DB::table('attendances')->where('student_id', $child->user_id)->where('status', 'absent')->count(),
+                    'late'    => \DB::table('attendances')->where('student_id', $child->user_id)->where('status', 'late')->count(),
+                ];
+
+                // 🌟 تجهيز بيانات الرسم الشبكي (الرادار) للأداء الأكاديمي 🌟
+                $radarLabels = [];
+                $radarData = [];
+                foreach ($subjectsData as $sd) {
+                    $radarLabels[] = $sd->subject_name;
+                    $radarData[] = $sd->max_total > 0 ? round(($sd->total_score / $sd->max_total) * 100) : 0;
+                }
+
+                $childrenDetails[$child->user_id] = (object)[
                     'subjects'    => $subjectsData,
                     'percentage'  => $percentage,
                     'total_score' => $totalStudentScore,
-                    'max_score'   => $totalMaxScore
+                    'max_score'   => $totalMaxScore,
+                    'wallet'      => $child->wallet_balance ?? 0,
+                    'attendance'  => $attendanceStats,
+                    'chartLabels' => json_encode($radarLabels),
+                    'chartData'   => json_encode($radarData)
                 ];
 
             } else {
-                $childrenDetails[$child->id] = (object)['subjects' => collect(), 'percentage' => 0, 'total_score' => 0, 'max_score' => 0];
+                $childrenDetails[$child->user_id] = (object)[
+                    'subjects' => collect(), 
+                    'percentage' => 0, 
+                    'total_score' => 0, 
+                    'max_score' => 0,
+                    'wallet' => 0,
+                    'attendance' => ['present' => 0, 'absent' => 0, 'late' => 0],
+                    'chartLabels' => '[]',
+                    'chartData' => '[]'
+                ];
             }
         }
 
@@ -207,5 +239,155 @@ class ParentController extends Controller
         }
 
         return view('parent.exams', compact('calendarDays'));
+    }
+
+    // 1. الرسوم والدفعات
+    public function fees()
+    {
+        $parentId = Auth::id();
+        $children = StudentProfile::whereIn('user_id', function($q) use ($parentId) {
+                        $q->select('student_id')->from('parent_student')->where('parent_id', $parentId);
+                    })->with('feePayments')->get();
+
+        return view('parent.fees', compact('children'));
+    }
+
+    // 2. الواجبات المدرسية
+    public function homeworks()
+    {
+        $parentId = Auth::id();
+        $children = StudentProfile::whereIn('user_id', function($q) use ($parentId) {
+                        $q->select('student_id')->from('parent_student')->where('parent_id', $parentId);
+                    })->get();
+
+        $classIds = $children->pluck('class_id')->filter()->unique();
+
+        $homeworks = Homework::whereIn('class_id', $classIds)
+            ->with(['subject', 'teacher', 'schoolClass'])
+            ->orderBy('due_date', 'asc')
+            ->get();
+
+        return view('parent.homeworks', compact('children', 'homeworks'));
+    }
+
+    // 3. طلبات الاستئذان
+    public function leaves()
+    {
+        $parentId = Auth::id();
+        $leaves = LeaveRequest::where('parent_id', $parentId)->with('student.user')->orderBy('created_at', 'desc')->get();
+        $children = StudentProfile::whereIn('user_id', function($q) use ($parentId) {
+                        $q->select('student_id')->from('parent_student')->where('parent_id', $parentId);
+                    })->with('user')->get();
+
+        return view('parent.leaves', compact('leaves', 'children'));
+    }
+
+    public function storeLeave(Request $request)
+    {
+        $request->validate([
+            'student_id' => 'required|exists:student_profiles,id',
+            'type' => 'required|in:absence,early_leave',
+            'leave_date' => 'required|date',
+            'reason' => 'required|string',
+        ]);
+
+        LeaveRequest::create([
+            'parent_id' => Auth::id(),
+            'student_id' => $request->student_id,
+            'type' => $request->type,
+            'leave_date' => $request->leave_date,
+            'reason' => $request->reason,
+            'status' => 'pending'
+        ]);
+
+        return back()->with('success', 'تم إرسال طلب الاستئذان للإدارة بنجاح.');
+    }
+
+    // 6. المحفظة الرقمية
+    public function wallet()
+    {
+        $parentId = Auth::id();
+        $children = StudentProfile::whereIn('user_id', function($q) use ($parentId) {
+                        $q->select('student_id')->from('parent_student')->where('parent_id', $parentId);
+                    })->with('user')->get();
+
+        $transactions = [];
+        foreach($children as $child) {
+            $transactions[$child->id] = WalletTransaction::where('student_id', $child->id)
+                                        ->orderBy('created_at', 'desc')
+                                        ->get();
+        }
+
+        return view('parent.wallet', compact('children', 'transactions'));
+    }
+    // عرض أبناء ولي الأمر
+    public function children()
+    {
+        $parentId = Auth::id();
+        $children = StudentProfile::whereIn('user_id', function($q) use ($parentId) {
+            $q->select('student_id')->from('parent_student')->where('parent_id', $parentId);
+        })->with('user', 'schoolClass')->get();
+
+        return view('parent.children', compact('children'));
+    }
+
+    // عرض درجات الأبناء
+    public function grades()
+    {
+        $parentId = Auth::id();
+        $children = StudentProfile::whereIn('user_id', function($q) use ($parentId) {
+            $q->select('student_id')->from('parent_student')->where('parent_id', $parentId);
+        })->with('user')->get();
+
+        // تمرير المتغيرات المطلوبة في blade
+        foreach ($children as $child) {
+            $child->name = $child->user->name ?? 'غير معروف';
+            $child->class_name = $child->schoolClass->name ?? 'غير محدد';
+        }
+
+        return view('parent.grades', compact('children'));
+    }
+
+    // عرض سلوك الأبناء
+    public function behaviour()
+    {
+        $parentId = Auth::id();
+        $children = StudentProfile::whereIn('user_id', function($q) use ($parentId) {
+            $q->select('student_id')->from('parent_student')->where('parent_id', $parentId);
+        })->with('user')->get();
+
+        return view('parent.behaviour', compact('children'));
+    }
+
+    // عرض وإرسال رسائل
+    public function messages(Request $request)
+    {
+        // إذا كان طلب POST، قم بحفظ الرسالة أو معالجتها
+        if ($request->isMethod('post')) {
+            // إضافة معالجة بسيطة في حالة الإرسال لتجنب الأخطاء
+            $request->validate([
+                'subject' => 'required|string',
+                'body' => 'required|string'
+            ]);
+
+            \App\Models\Message::create([
+                'sender_id' => Auth::id(),
+                'subject' => $request->subject,
+                'body' => $request->body,
+                'type' => 'parent_to_school'
+            ]);
+
+            return back()->with('success', 'تم إرسال الرسالة للإدارة بنجاح.');
+        }
+
+        // جلب الرسائل المستلمة لولي الأمر
+        $messages = \App\Models\Message::where('receiver_id', Auth::id())
+            ->orWhere(function($query) {
+                $query->where('type', 'broadcast')->where('target_role', 'parent');
+            })
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return view('parent.messages', compact('messages'));
     }
 }

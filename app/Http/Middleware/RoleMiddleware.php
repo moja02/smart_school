@@ -21,8 +21,8 @@ class RoleMiddleware
         }
 
         // التحقق من صلاحية المستخدم
-        // إذا كان الدور المطلوب لا يطابق دور المستخدم الحالي
-        if (Auth::user()->role !== $role) {
+        // ندعم طريقتين: عمود role المباشر، أو صلاحيات Spatie
+        if (!Auth::user()->hasRole($role) && Auth::user()->role !== $role) {
             abort(403, 'ليس لديك صلاحية الوصول لهذه الصفحة.');
         }
 

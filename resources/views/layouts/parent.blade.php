@@ -34,6 +34,19 @@
         <a href="{{ route('parent.attendance') }}" class="{{ request()->routeIs('parent.attendance') ? 'active' : '' }}">
             <i class="fas fa-calendar-alt"></i> سجل الحضور
         </a>
+
+        <a href="{{ route('parent.fees') }}" class="{{ request()->routeIs('parent.fees') ? 'active' : '' }}">
+            <i class="fas fa-file-invoice-dollar"></i> الرسوم والدفعات
+        </a>
+        <a href="{{ route('parent.homeworks') }}" class="{{ request()->routeIs('parent.homeworks') ? 'active' : '' }}">
+            <i class="fas fa-book"></i> الواجبات المدرسية
+        </a>
+        <a href="{{ route('parent.leaves') }}" class="{{ request()->routeIs('parent.leaves') ? 'active' : '' }}">
+            <i class="fas fa-envelope-open-text"></i> طلبات الاستئذان
+        </a>
+        <a href="{{ route('parent.wallet') }}" class="{{ request()->routeIs('parent.wallet') ? 'active' : '' }}">
+            <i class="fas fa-wallet"></i> المحفظة والمقصف
+        </a>
         
         <a href="{{ route('messages.index') }}" class="{{ request()->routeIs('messages.*') ? 'active' : '' }} d-flex justify-content-between">
             <div><i class="fas fa-comments"></i> المحادثات</div>

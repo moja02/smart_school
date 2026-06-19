@@ -24,7 +24,7 @@ class AssessmentMark extends Model
     // علاقة الدرجة بالطالب
     public function student()
     {
-        return $this->belongsTo(StudentProfile::class, 'student_id');
+        return $this->belongsTo(User::class, 'student_id');
     }
 
     // علاقة الدرجة بالتقييم

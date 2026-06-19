@@ -8,18 +8,22 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
-        $table->id();
-        $table->string('name');
-        $table->string('email')->unique();
-        $table->timestamp('email_verified_at')->nullable();
-        $table->string('password');
-        $table->enum('role', ['admin', 'teacher', 'student', 'parent'])->default('student');
-        
-        $table->foreignId('school_id')->nullable()->constrained('schools')->onDelete('cascade');
-        
-        $table->rememberToken();
-        $table->timestamps();
-    });
+            $table->id();
+            $table->string('name');
+            $table->string('email')->unique();
+            $table->string('phone')->nullable();
+            $table->text('address')->nullable();
+            $table->date('birth_date')->nullable();
+            $table->timestamp('email_verified_at')->nullable();
+            $table->string('password');
+            $table->enum('role', ['admin', 'teacher', 'student', 'parent'])->default('student');
+            $table->boolean('is_banned')->default(0);
+            
+            $table->foreignId('school_id')->nullable()->constrained('schools')->onDelete('cascade');
+            
+            $table->rememberToken();
+            $table->timestamps();
+        });
     }
 
     public function down(): void

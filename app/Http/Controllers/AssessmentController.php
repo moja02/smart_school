@@ -226,6 +226,16 @@ class AssessmentController extends Controller
             ->where('assessments.section_id', $sectionId) 
             ->sum('assessment_marks.score');
 
+        // جلب درجة النهائي الحالية (إن وجدت) لحساب المجموع الشامل
+        $currentRecord = DB::table('student_scores')
+            ->where('student_id', $studentId)
+            ->where('subject_id', $subjectId)
+            ->where('class_id', $sectionId)
+            ->first();
+
+        $finalScore = $currentRecord->final_score ?? 0;
+        $totalScore = $totalWorks + $finalScore;
+
         DB::table('student_scores')->updateOrInsert(
             [
                 'student_id' => $studentId, 
@@ -235,6 +245,7 @@ class AssessmentController extends Controller
             [
                 'school_id'   => auth()->user()->school_id,
                 'works_score' => $totalWorks,
+                'total_score' => $totalScore,
                 'updated_at'  => now()
             ]
         );

@@ -28,7 +28,11 @@ return new class extends Migration
     Schema::create('subjects', function (Blueprint $table) {
         $table->id();
         $table->string('name');
+        $table->integer('works_score')->default(40);
+        $table->integer('final_score')->default(60);
+        $table->integer('total_score')->default(100);
         $table->foreignId('school_id')->nullable()->constrained('schools')->onDelete('cascade');
+        $table->foreignId('grade_id')->nullable()->constrained('grades')->onDelete('cascade');
         $table->timestamps();
     });
 

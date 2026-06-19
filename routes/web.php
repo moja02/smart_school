@@ -16,6 +16,8 @@ use App\Http\Controllers\AssessmentController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\SystemManagerController;
+use App\Http\Controllers\AdmissionController;
+use App\Http\Controllers\FeeController;
 // ====================================================
 // 1. المصادقة والصفحة الرئيسية
 // ====================================================
@@ -36,6 +38,12 @@ Route::post('/register', [AuthController::class, 'register'])->name('register');
 // الصفحة العامة بعد الدخول
 Route::get('/home', [userController::class, 'index'])->name('home');
 
+// طلب التسجيل (Admissions)
+Route::get('/admissions/apply', [AdmissionController::class, 'create'])->name('admissions.create');
+Route::post('/admissions/apply', [AdmissionController::class, 'store'])->name('admissions.store');
+Route::get('/admissions/success', function() {
+    return "تم التقديم بنجاح";
+})->name('admissions.success');
 
 // ====================================================
 // 2. راوتات محمية (تتطلب تسجيل دخول)
@@ -44,6 +52,11 @@ Route::middleware(['auth'])->group(function () {
     // روابط الملف الشخصي الموحدة
     Route::get('/profile', [App\Http\Controllers\ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [App\Http\Controllers\ProfileController::class, 'update'])->name('profile.update');
+    
+    // المراسلة اللحظية
+    Route::get('/chat', [\App\Http\Controllers\ChatController::class, 'index'])->name('chat.index');
+    Route::get('/chat/messages/{userId}', [\App\Http\Controllers\ChatController::class, 'fetchMessages'])->name('chat.messages');
+    Route::post('/chat/send', [\App\Http\Controllers\ChatController::class, 'sendMessage'])->name('chat.send');
     // ==========================================
     // 👔 روابط مدير المدرسة (School Manager)
     // ==========================================
@@ -139,9 +152,32 @@ Route::put('/admin/assign/update', [AdminController::class, 'updateAssignment'])
         Route::get('/students', [AdminController::class, 'listStudents'])->name('admin.students');
         Route::delete('/admin/students/{id}', [AdminController::class, 'deleteStudent'])->name('admin.students.delete');
         
+        // 6. إدارة الرسوم (Fees Management)
+        Route::get('/admin/fees', [FeeController::class, 'index'])->name('admin.fees.index');
+        Route::post('/admin/fees/{id}', [FeeController::class, 'updateTotalFees'])->name('admin.fees.update_total');
+        Route::post('/admin/fees/{id}/payment', [FeeController::class, 'storePayment'])->name('admin.fees.pay');
+        Route::get('/admin/fees/receipt/{id}', [FeeController::class, 'printReceipt'])->name('admin.fees.receipt');
+        Route::post('/admin/fees/suspend/{id}', [FeeController::class, 'toggleSuspend'])->name('admin.fees.suspend');
+
+        // مسار القبول والتسجيل
+        Route::get('/admin/admissions/index', [AdminController::class, 'admissionsIndex'])->name('admin.admissions.index');
+        Route::post('/admin/admissions/{id}/status', [AdminController::class, 'updateAdmissionStatus'])->name('admin.admissions.status');
+        
+        // مسار الاستئذان والمحفظة
+        Route::get('/admin/leaves', [AdminController::class, 'leavesIndex'])->name('admin.leaves');
+        Route::post('/admin/leaves/{id}/status', [AdminController::class, 'updateLeaveStatus'])->name('admin.leaves.status');
+        
+        Route::get('/admin/wallet', [AdminController::class, 'walletIndex'])->name('admin.wallet');
+        Route::post('/admin/wallet/topup', [AdminController::class, 'topupWallet'])->name('admin.wallet.topup');
+        Route::post('/admin/wallet/purchase', [AdminController::class, 'purchaseWallet'])->name('admin.wallet.purchase');
+        
         // الطلاب غير الموزعين وتسكينهم
         Route::get('/admin/students/unassigned', [AdminController::class, 'listUnassignedStudents'])->name('admin.students.unassigned');
         Route::post('/admin/students/update-class', [AdminController::class, 'updateStudentClass'])->name('admin.students.updateClass');
+
+        // إغلاق العام الدراسي
+        Route::get('/admin/close-year', [AdminController::class, 'showCloseYear'])->name('admin.close_year.index');
+        Route::post('/admin/close-year/execute', [AdminController::class, 'executeCloseYear'])->name('admin.close_year.execute');
 
         // 6. ربط الآباء
         Route::get('/admin/parents/link', [AdminController::class, 'createParentLink'])->name('admin.parents.link');
@@ -153,6 +189,8 @@ Route::put('/admin/assign/update', [AdminController::class, 'updateAssignment'])
         // ✅ هذا هو السطر الذي تم إصلاحه هنا (تغيير listSchedules إلى showSchedules)
         Route::get('/admin/schedule', [AdminController::class, 'showSchedules'])->name('admin.schedule.index');
         Route::post('/admin/schedules/generate', [AdminController::class, 'generateAutoSchedule'])->name('admin.schedules.generate');
+        Route::post('/admin/schedules/revert', [AdminController::class, 'revertSchedule'])->name('admin.schedules.revert');
+        Route::post('/admin/schedules/confirm', [AdminController::class, 'confirmSchedule'])->name('admin.schedules.confirm');
         // تبديل الحصص بين الأساتذة
         Route::post('/admin/schedules/check-swap', [AdminController::class, 'checkSwapAvailability'])->name('admin.schedules.check_swap');
         Route::post('/admin/schedules/swap', [AdminController::class, 'swapSchedules'])->name('admin.schedules.swap');
@@ -188,6 +226,11 @@ Route::put('/admin/assign/update', [AdminController::class, 'updateAssignment'])
 
         //9. تشغيل او ايقاف الرصد
         Route::post('/grading/toggle', [AdminController::class, 'toggleGrading'])->name('admin.grading.toggle');
+
+        // المحاسبة والمصروفات
+        Route::get('/accounting/expenses', [App\Http\Controllers\AccountingController::class, 'expensesIndex'])->name('admin.accounting.expenses');
+        Route::post('/accounting/expenses', [App\Http\Controllers\AccountingController::class, 'storeExpense'])->name('admin.accounting.expenses.store');
+        Route::get('/accounting/report', [App\Http\Controllers\AccountingController::class, 'profitLossReport'])->name('admin.accounting.report');
     });
 
     // ====================================================
@@ -207,9 +250,19 @@ Route::put('/admin/assign/update', [AdminController::class, 'updateAssignment'])
         Route::get('/subject/{subject_id}/class/{class_id}', [TeacherController::class, 'showSubject'])->name('teacher.subject.show');
         Route::get('/teacher/class/{subject_id}/{class_id}', [TeacherController::class, 'showClass'])->name('teacher.class.show');
 
+        // الدروس والواجبات
+        Route::post('/lessons', [TeacherController::class, 'storeLesson'])->name('teacher.lessons.store');
+        Route::get('/lessons/{id}/edit', [TeacherController::class, 'editLesson'])->name('teacher.lesson.edit');
+        Route::put('/lessons/{id}', [TeacherController::class, 'updateLesson'])->name('teacher.lesson.update');
+        
+        Route::get('/homeworks/{subject_id}/{section_id}', [TeacherController::class, 'homeworks'])->name('teacher.homeworks.index');
+        Route::post('/homeworks', [TeacherController::class, 'storeHomework'])->name('teacher.homeworks.store');
+        Route::delete('/homeworks/{id}', [TeacherController::class, 'destroyHomework'])->name('teacher.homeworks.destroy');
+
         // الأسئلة والتقييمات
         Route::get('/subject/{subject_id}/class/{class_id}/questions/create', [TeacherController::class, 'createQuestion'])->name('teacher.questions.create');
         Route::post('/subject/{subject_id}/class/{class_id}/questions', [TeacherController::class, 'storeQuestion'])->name('teacher.questions.store');
+        Route::get('/questions/{id}/edit', [TeacherController::class, 'editQuestion'])->name('teacher.question.edit');
         // صفحة رصد درجات تقييم معين
         Route::get('/teacher/assessments/{assessment_id}/marks', [AssessmentController::class, 'editMarks'])->name('teacher.assessments.marks');
         
@@ -276,6 +329,12 @@ Route::put('/admin/assign/update', [AdminController::class, 'updateAssignment'])
 Route::delete('/teacher/assessments/{id}', [App\Http\Controllers\TeacherController::class, 'destroyAssessment'])->name('teacher.assessments.destroy');
 
     Route::get('/my-schedule', [App\Http\Controllers\TeacherController::class, 'myWeeklySchedule'])->name('teacher.schedule.weekly');
+
+        // الاختبارات الإلكترونية
+        Route::get('/teacher/online-exams', [TeacherController::class, 'onlineExamsIndex'])->name('teacher.online_exams.index');
+        Route::post('/teacher/online-exams', [TeacherController::class, 'storeOnlineExam'])->name('teacher.online_exams.store');
+        Route::get('/teacher/online-exams/{id}', [TeacherController::class, 'showOnlineExam'])->name('teacher.online_exams.show');
+        Route::post('/teacher/online-exams/{id}/questions', [TeacherController::class, 'storeOnlineExamQuestion'])->name('teacher.online_exams.questions.store');
     });
 
     // ====================================================
@@ -307,9 +366,14 @@ Route::delete('/teacher/assessments/{id}', [App\Http\Controllers\TeacherControll
         Route::get('/attendance', [StudentController::class, 'attendance'])->name('student.attendance');
         Route::get('/messages', [StudentController::class, 'messages'])->name('student.messages');
 
-        // الاختبارات (Quiz)
-        Route::get('/lesson/{id}/quiz', [StudentController::class, 'startQuiz'])->name('student.quiz.start');
-        Route::post('/lesson/{id}/quiz', [StudentController::class, 'submitQuiz'])->name('student.quiz.submit');
+        // الاختبارات التجريبية للمادة
+        Route::get('/lesson/{id}/quiz/start', [StudentController::class, 'startQuiz'])->name('student.quiz.start');
+        Route::post('/lesson/{id}/quiz/submit', [StudentController::class, 'submitQuiz'])->name('student.quiz.submit');
+
+        // الاختبارات الإلكترونية الشاملة (Online Exams)
+        Route::get('/online-exams', [StudentController::class, 'onlineExams'])->name('student.online_exams.index');
+        Route::get('/online-exams/{id}/take', [StudentController::class, 'takeOnlineExam'])->name('student.online_exams.take');
+        Route::post('/online-exams/{id}/submit', [StudentController::class, 'submitOnlineExam'])->name('student.online_exams.submit');
 
         Route::get('/exams-calendar', [App\Http\Controllers\StudentController::class, 'examsCalendar'])->name('student.exams.calendar');
     });
@@ -327,7 +391,12 @@ Route::delete('/teacher/assessments/{id}', [App\Http\Controllers\TeacherControll
         Route::get('/grades', [ParentController::class, 'grades'])->name('parent.grades');
         Route::get('/attendance', [ParentController::class, 'attendance'])->name('parent.attendance');
         Route::get('/behaviour', [ParentController::class, 'behaviour'])->name('parent.behaviour');
-        Route::get('/messages', [ParentController::class, 'messages'])->name('parent.messages');
+        Route::match(['get', 'post'], '/messages', [ParentController::class, 'messages'])->name('parent.messages');
+        Route::get('/fees', [ParentController::class, 'fees'])->name('parent.fees');
+        Route::get('/homeworks', [ParentController::class, 'homeworks'])->name('parent.homeworks');
+        Route::get('/leaves', [ParentController::class, 'leaves'])->name('parent.leaves');
+        Route::post('/leaves', [ParentController::class, 'storeLeave'])->name('parent.leaves.store');
+        Route::get('/wallet', [ParentController::class, 'wallet'])->name('parent.wallet');
     });
 
     Route::get('/parent/exams', [App\Http\Controllers\ParentController::class, 'examsCalendar'])->name('parent.exams');

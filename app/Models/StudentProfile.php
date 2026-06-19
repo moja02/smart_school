@@ -14,7 +14,11 @@ class StudentProfile extends Model
 
     protected $fillable = [
         'user_id',
-        'class_id', 
+        'class_id',
+        'total_fees',
+        'paid_fees',
+        'wallet_balance',
+        'daily_limit',
     ];
     // العلاقة مع المستخدم الأساسي (الاسم، الايميل..)
     public function user()
@@ -28,21 +32,27 @@ class StudentProfile extends Model
         return $this->belongsTo(SchoolClass::class, 'class_id');
     }
 
-    // ✅ هذه هي العلاقة الناقصة: الطالب يتبع ولي أمر
-    public function parent()
-    {
-        return $this->belongsTo(ParentProfile::class, 'parent_id');
-    }
+    // العلاقة مع أولياء الأمور تتم عبر موديل User والجدول الوسيط parent_student
 
     public function assessmentMarks()
     {
         return $this->hasMany(AssessmentMark::class, 'student_id');
     }
 
+    public function feePayments()
+    {
+        return $this->hasMany(FeePayment::class, 'student_id');
+    }
+
+    public function getRemainingFeesAttribute()
+    {
+        return max(0, $this->total_fees - $this->paid_fees);
+    }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['user_id', 'class_id'])
+            ->logOnly(['user_id', 'class_id', 'total_fees', 'paid_fees'])
             ->logOnlyDirty()
             ->useLogName('سجلات الطلاب الأكاديمية');
     }
