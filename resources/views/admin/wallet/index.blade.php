@@ -133,6 +133,10 @@
                         <label class="form-label">تفاصيل المشتريات (اختياري)</label>
                         <input type="text" name="description" class="form-control" value="مشتريات من المقصف المدرسي">
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">الرقم السري للطالب (PIN) - إذا كان مفعلاً</label>
+                        <input type="password" name="wallet_pin" class="form-control" maxlength="4" placeholder="••••">
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>

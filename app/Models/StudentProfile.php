@@ -19,6 +19,7 @@ class StudentProfile extends Model
         'paid_fees',
         'wallet_balance',
         'daily_limit',
+        'wallet_pin',
     ];
     // العلاقة مع المستخدم الأساسي (الاسم، الايميل..)
     public function user()

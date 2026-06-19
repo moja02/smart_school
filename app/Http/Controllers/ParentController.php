@@ -303,6 +303,33 @@ class ParentController extends Controller
         return back()->with('success', 'تم إرسال طلب الاستئذان للإدارة بنجاح.');
     }
 
+    public function updateWalletPin(Request $request)
+    {
+        $request->validate([
+            'student_id' => 'required|exists:student_profiles,id',
+            'wallet_pin' => 'nullable|digits:4'
+        ]);
+
+        $parentId = Auth::id();
+        
+        // Verify child belongs to parent
+        $isChild = \DB::table('parent_student')
+            ->join('student_profiles', 'parent_student.student_id', '=', 'student_profiles.user_id')
+            ->where('parent_student.parent_id', $parentId)
+            ->where('student_profiles.id', $request->student_id)
+            ->exists();
+            
+        if (!$isChild) {
+            abort(403, 'غير مصرح لك بتعديل بيانات هذا الطالب.');
+        }
+
+        $profile = StudentProfile::findOrFail($request->student_id);
+        $profile->wallet_pin = $request->wallet_pin;
+        $profile->save();
+
+        return back()->with('success', 'تم تحديث الرقم السري للمحفظة بنجاح.');
+    }
+
     // 6. المحفظة الرقمية
     public function wallet()
     {

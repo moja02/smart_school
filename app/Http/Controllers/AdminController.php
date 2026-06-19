@@ -2571,9 +2571,17 @@ $assessments = \App\Models\Assessment::where('subject_id', $selectedSubject)
 
         $request->validate([
             'student_id' => 'required|exists:student_profiles,id',
-            'amount' => 'required|numeric|min:0.5'
+            'amount' => 'required|numeric|min:0.5',
+            'wallet_pin' => 'nullable|string|size:4'
         ]);
         $studentProfile = \App\Models\StudentProfile::findOrFail($request->student_id);
+        
+        if (!empty($studentProfile->wallet_pin)) {
+            if ($request->wallet_pin !== $studentProfile->wallet_pin) {
+                return back()->with('error', 'الرقم السري غير صحيح، لا يمكن إتمام عملية الشراء!');
+            }
+        }
+
         if (($studentProfile->wallet_balance ?? 0) >= $request->amount) {
             $studentProfile->wallet_balance -= $request->amount;
             $studentProfile->save();

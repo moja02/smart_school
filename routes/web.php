@@ -397,6 +397,7 @@ Route::delete('/teacher/assessments/{id}', [App\Http\Controllers\TeacherControll
         Route::get('/leaves', [ParentController::class, 'leaves'])->name('parent.leaves');
         Route::post('/leaves', [ParentController::class, 'storeLeave'])->name('parent.leaves.store');
         Route::get('/wallet', [ParentController::class, 'wallet'])->name('parent.wallet');
+        Route::post('/wallet/pin', [ParentController::class, 'updateWalletPin'])->name('parent.wallet.pin');
     });
 
     Route::get('/parent/exams', [App\Http\Controllers\ParentController::class, 'examsCalendar'])->name('parent.exams');

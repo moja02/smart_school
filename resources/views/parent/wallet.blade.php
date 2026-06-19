@@ -21,6 +21,24 @@
                     </h3>
                 </div>
             </div>
+            
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="p-3 bg-light rounded border border-secondary border-opacity-25">
+                        <h6 class="text-secondary fw-bold mb-3"><i class="fas fa-lock me-1"></i> إعداد الرقم السري للمقصف</h6>
+                        <form action="{{ route('parent.wallet.pin') }}" method="POST" class="d-flex align-items-center gap-2">
+                            @csrf
+                            <input type="hidden" name="student_id" value="{{ $child->id }}">
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="fas fa-key text-muted"></i></span>
+                                <input type="password" name="wallet_pin" class="form-control" maxlength="4" placeholder="•••• (4 أرقام)" value="{{ $child->wallet_pin }}" required>
+                                <button type="submit" class="btn btn-outline-primary">حفظ / تعديل</button>
+                            </div>
+                        </form>
+                        <small class="text-muted d-block mt-2">لحماية رصيد الطالب، يمكنك وضع رقم سري (PIN) من 4 أرقام سيُطلب منه عند الشراء من المقصف. (استخدم 4 أرقام فقط)</small>
+                    </div>
+                </div>
+            </div>
 
             <h6 class="text-secondary fw-bold mb-3"><i class="fas fa-history me-1"></i> سجل العمليات الأخيرة</h6>
             @if(isset($transactions[$child->id]) && $transactions[$child->id]->count() > 0)
