@@ -199,9 +199,15 @@ class StudentController extends Controller
         $studentTotal = $worksTotal + $finalTotal;
         $percentage = $maxPossibleTotal > 0 ? round(($studentTotal / $maxPossibleTotal) * 100, 1) : 0;
 
+        // 4. جلب الملفات الدراسية المتاحة لهذه المادة وهذا الفصل
+        $materials = \App\Models\StudyMaterial::where('subject_id', $id)
+            ->where('section_id', $sectionId)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         return view('student.subjects.show', compact(
             'subject', 'lessons', 'distribution', 'assessments', 
-            'worksTotal', 'finalTotal', 'studentTotal', 'percentage'
+            'worksTotal', 'finalTotal', 'studentTotal', 'percentage', 'materials'
         ));
     }
 
@@ -430,6 +436,11 @@ class StudentController extends Controller
     /**
      * عرض جدول الامتحانات (الـ 30 يوماً القادمة)
      */
+    public function examsIndex()
+    {
+        return view('student.exams.index');
+    }
+
     public function examsCalendar()
     {
         $user = auth()->user();
@@ -562,5 +573,30 @@ class StudentController extends Controller
         ]);
 
         return redirect()->route('student.online_exams.index')->with('success', "تم تسليم الاختبار! نتيجتك: $score");
+    }
+
+    /**
+     * تحميل ملف دراسي
+     */
+    public function downloadMaterial($id)
+    {
+        $user = auth()->user();
+        $studentProfile = StudentProfile::where('user_id', $user->id)->first();
+        
+        if (!$studentProfile || !$studentProfile->class_id) {
+            return redirect()->back()->with('error', 'يجب أن تكون مسجلاً في فصل دراسي.');
+        }
+
+        $material = \App\Models\StudyMaterial::where('id', $id)
+            ->where('section_id', $studentProfile->class_id)
+            ->firstOrFail();
+
+        $filePath = storage_path('app/public/' . $material->file_path);
+
+        if (!file_exists($filePath)) {
+            return redirect()->back()->with('error', 'عذراً، الملف غير موجود.');
+        }
+
+        return response()->download($filePath, $material->file_name);
     }
 }

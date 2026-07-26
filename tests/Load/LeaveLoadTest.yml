@@ -1,0 +1,18 @@
+config:
+  target: "http://localhost:8000"
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: "Parents submitting leave requests"
+scenarios:
+  - name: "Submit Leave Request"
+    flow:
+      - post:
+          url: "/api/parent/leaves"
+          json:
+            student_id: 1
+            reason: "مريض"
+            leave_date: "2026-10-10"
+          capture:
+            - json: "$.status"
+              as: "status"

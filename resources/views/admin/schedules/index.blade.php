@@ -56,16 +56,16 @@
                     <p class="mb-0 text-muted small">هذا هو الجدول الجديد الذي تم توليده. لا زال النظام يحتفظ بالجدول القديم مؤقتاً.</p>
                 </div>
                 <div class="d-flex gap-2">
-                    <form action="{{ route('admin.schedules.revert') }}" method="POST">
+                    <form action="{{ route('admin.schedules.revert') }}" method="POST" id="revertForm">
                         @csrf
-                        <button type="submit" class="btn btn-outline-danger fw-bold rounded-pill shadow-sm" onclick="return confirm('هل أنت متأكد من حذف الجدول الجديد والعودة للجدول القديم؟')">
-                            <i class="fas fa-undo-alt me-1"></i> تراجع للقديم
+                        <button type="button" class="btn btn-outline-danger fw-bold rounded-pill shadow-sm" onclick="confirmAction(event, 'هل أنت متأكد من حذف الجدول الجديد والعودة للجدول القديم؟')">
+                            <i class="fas fa-times me-1"></i> رفض واستعادة القديم
                         </button>
                     </form>
                     <form action="{{ route('admin.schedules.confirm') }}" method="POST">
                         @csrf
-                        <button type="submit" class="btn btn-success fw-bold rounded-pill shadow-sm" onclick="return confirm('هل أنت متأكد من مسح الجدول القديم واعتماد هذا الجدول نهائياً؟')">
-                            <i class="fas fa-check-circle me-1"></i> اعتماد وحفظ
+                        <button type="button" class="btn btn-success fw-bold rounded-pill shadow-sm" onclick="confirmAction(event, 'هل أنت متأكد من مسح الجدول القديم واعتماد هذا الجدول نهائياً؟')">
+                            <i class="fas fa-check-double me-1"></i> اعتماد الجدول
                         </button>
                     </form>
                 </div>
@@ -499,6 +499,25 @@
             });
             resetSwapSelection();
         }
+    }
+
+    function confirmAction(event, message) {
+        event.preventDefault();
+        const form = event.currentTarget.closest('form');
+        Swal.fire({
+            title: 'هل أنت متأكد؟',
+            text: message,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#28a745',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'نعم، متأكد',
+            cancelButtonText: 'إلغاء'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                form.submit();
+            }
+        });
     }
 </script>
 @endsection

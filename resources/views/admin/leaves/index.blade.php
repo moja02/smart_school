@@ -3,9 +3,11 @@
 @section('content')
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3><i class="fas fa-envelope-open-text text-primary me-2"></i> طلبات الاستئذان والغياب</h3>
+        <h3><i class="fas fa-envelope-open-text text-primary me-2"></i> طلبات الاستئذان والغياب (اليوم)</h3>
+        <a href="{{ route('admin.leaves.history') }}" class="btn btn-secondary shadow-sm">
+            <i class="fas fa-history me-1"></i> سجل الطلبات السابقة
+        </a>
     </div>
-
     @if(session('success'))
         <div class="alert alert-success">{{ session('success') }}</div>
     @endif

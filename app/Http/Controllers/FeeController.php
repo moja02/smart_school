@@ -13,17 +13,44 @@ class FeeController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
+        $grade_id = $request->input('grade_id');
+        $payment_status = $request->input('payment_status');
+
+        $schoolId = auth()->user()->school_id;
+
+        $grades = \App\Models\Grade::whereIn('id', function($q) use ($schoolId) {
+            $q->select('grade_id')->from('school_grade')->where('school_id', $schoolId);
+        })->get();
 
         $students = StudentProfile::with(['user', 'schoolClass', 'parent.user', 'feePayments'])
+            ->whereHas('user', function($q) use ($schoolId) {
+                $q->where('school_id', $schoolId);
+            })
             ->when($search, function ($query, $search) {
                 return $query->whereHas('user', function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
                       ->orWhere('email', 'like', "%{$search}%");
                 });
             })
+            ->when($grade_id, function($query, $grade_id) {
+                return $query->whereHas('schoolClass', function($q) use ($grade_id) {
+                    $q->where('grade_id', $grade_id);
+                });
+            })
+            ->when($payment_status, function($query, $status) {
+                if ($status == 'full') {
+                    return $query->whereRaw('paid_fees >= total_fees')->where('total_fees', '>', 0);
+                } elseif ($status == 'partial') {
+                    return $query->where('paid_fees', '>', 0)->whereRaw('paid_fees < total_fees');
+                } elseif ($status == 'none') {
+                    return $query->where(function($q) {
+                        $q->where('paid_fees', 0)->orWhereNull('paid_fees');
+                    });
+                }
+            })
             ->paginate(15);
 
-        return view('admin.fees.index', compact('students', 'search'));
+        return view('admin.fees.index', compact('students', 'search', 'grades', 'grade_id', 'payment_status'));
     }
 
     public function updateTotalFees(Request $request, $id)
@@ -90,5 +117,70 @@ class FeeController extends Controller
 
         $status = $studentUser->is_banned ? 'تعطيل' : 'تفعيل';
         return back()->with('success', "تم {$status} حساب الطالب وولي الأمر بنجاح");
+    }
+
+    public function notifyParents(Request $request)
+    {
+        $search = $request->input('search');
+        $grade_id = $request->input('grade_id');
+        $payment_status = $request->input('payment_status');
+
+        $schoolId = auth()->user()->school_id;
+
+        $studentsQuery = StudentProfile::with(['user', 'schoolClass'])
+            ->whereHas('user', function($q) use ($schoolId) {
+                $q->where('school_id', $schoolId);
+            })
+            ->when($search, function ($query, $search) {
+                return $query->whereHas('user', function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%");
+                });
+            })
+            ->when($grade_id, function($query, $grade_id) {
+                return $query->whereHas('schoolClass', function($q) use ($grade_id) {
+                    $q->where('grade_id', $grade_id);
+                });
+            })
+            ->when($payment_status, function($query, $status) {
+                if ($status == 'full') {
+                    return $query->whereRaw('paid_fees >= total_fees')->where('total_fees', '>', 0);
+                } elseif ($status == 'partial') {
+                    return $query->where('paid_fees', '>', 0)->whereRaw('paid_fees < total_fees');
+                } elseif ($status == 'none') {
+                    return $query->where(function($q) {
+                        $q->where('paid_fees', 0)->orWhereNull('paid_fees');
+                    });
+                }
+            });
+
+        $studentIds = $studentsQuery->pluck('id');
+
+        if ($studentIds->isEmpty()) {
+            return back()->with('error', 'لا يوجد طلاب مطابقين للفلترة المحددة.');
+        }
+
+        $parentIds = \Illuminate\Support\Facades\DB::table('parent_student')
+                        ->whereIn('student_id', $studentIds)
+                        ->pluck('parent_id')
+                        ->unique();
+
+        if ($parentIds->isEmpty()) {
+            return back()->with('error', 'الطلاب المعروضين ليس لديهم حسابات أولياء أمور مسجلة.');
+        }
+
+        $senderId = auth()->id();
+        $count = 0;
+        
+        foreach ($parentIds as $parentId) {
+            \App\Models\Message::create([
+                'sender_id' => $senderId,
+                'receiver_id' => $parentId,
+                'message' => 'تنبيه إداري: يرجى مراجعة حالة الرسوم الدراسية لأبنائكم في النظام واستكمال تسديد أي مبالغ مستحقة. شكراً لتعاونكم.',
+            ]);
+            $count++;
+        }
+
+        return back()->with('success', "تم إرسال التنبيه الجماعي بنجاح إلى {$count} ولي أمر.");
     }
 }

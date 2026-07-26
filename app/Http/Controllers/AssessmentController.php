@@ -48,10 +48,12 @@ class AssessmentController extends Controller
         $remSem1 = max(0, $maxPerSemester - $sumSem1);
         $remSem2 = max(0, $maxPerSemester - $sumSem2);
 
-        $isLocked = DB::table('schools')->where('id', $schoolId)->value('grading_locked');
+        $school = DB::table('schools')->where('id', $schoolId)->first();
+        $isLockedSem1 = $school->grading_locked_sem1;
+        $isLockedSem2 = $school->grading_locked_sem2;
 
         return view('teacher.assessments.index', compact(
-            'subject', 'section', 'assessments', 'isLocked',
+            'subject', 'section', 'assessments', 'isLockedSem1', 'isLockedSem2',
             'maxPerSemester', 'remSem1', 'remSem2'
         ));
     }
@@ -62,8 +64,9 @@ class AssessmentController extends Controller
     public function store(Request $request)
     {
         $schoolId = auth()->user()->school_id;
-        $isLocked = DB::table('schools')->where('id', $schoolId)->value('grading_locked');
-        if ($isLocked) return back()->with('error', 'الرصد مغلق حالياً 🔒');
+        $school = DB::table('schools')->where('id', $schoolId)->first();
+        if ($request->semester == 1 && $school->grading_locked_sem1) return back()->with('error', 'رصد الفصل الأول مغلق حالياً 🔒');
+        if ($request->semester == 2 && $school->grading_locked_sem2) return back()->with('error', 'رصد الفصل الثاني مغلق حالياً 🔒');
 
         $request->validate([
             'name'       => 'required|string|max:191',
@@ -124,6 +127,10 @@ class AssessmentController extends Controller
 
         $assessment = Assessment::findOrFail($id);
         $schoolId = auth()->user()->school_id;
+        
+        $school = DB::table('schools')->where('id', $schoolId)->first();
+        if ($assessment->semester == 1 && $school->grading_locked_sem1) return back()->with('error', 'لا يمكن التعديل، رصد الفصل الأول مغلق 🔒');
+        if ($assessment->semester == 2 && $school->grading_locked_sem2) return back()->with('error', 'لا يمكن التعديل، رصد الفصل الثاني مغلق 🔒');
 
         $settings = DB::table('school_subject_settings')
             ->where('school_id', $schoolId)
@@ -159,6 +166,10 @@ class AssessmentController extends Controller
     public function destroy($id)
     {
         $assessment = Assessment::findOrFail($id);
+        $schoolId = auth()->user()->school_id;
+        $school = DB::table('schools')->where('id', $schoolId)->first();
+        if ($assessment->semester == 1 && $school->grading_locked_sem1) return back()->with('error', 'لا يمكن الحذف، رصد الفصل الأول مغلق 🔒');
+        if ($assessment->semester == 2 && $school->grading_locked_sem2) return back()->with('error', 'لا يمكن الحذف، رصد الفصل الثاني مغلق 🔒');
         DB::table('assessment_marks')->where('assessment_id', $id)->delete();
         $assessment->delete();
 
@@ -185,7 +196,8 @@ class AssessmentController extends Controller
             ->where('assessment_id', $assessmentId)
             ->pluck('score', 'student_id');
 
-        $isLocked = DB::table('schools')->where('id', auth()->user()->school_id)->value('grading_locked');
+        $school = DB::table('schools')->where('id', auth()->user()->school_id)->first();
+        $isLocked = ($assessment->semester == 1) ? $school->grading_locked_sem1 : $school->grading_locked_sem2;
 
         return view('teacher.assessments.marks', compact('assessment', 'subject', 'section', 'students', 'marks', 'isLocked'));
     }
@@ -195,11 +207,12 @@ class AssessmentController extends Controller
     // ==========================================
     public function saveMarks(Request $request)
     {
-        $isLocked = DB::table('schools')->where('id', auth()->user()->school_id)->value('grading_locked');
-        if ($isLocked) return back()->with('error', 'الرصد مغلق حالياً 🔒');
-
         $assessmentId = $request->assessment_id;
         $assessment = DB::table('assessments')->find($assessmentId);
+        
+        $school = DB::table('schools')->where('id', auth()->user()->school_id)->first();
+        $isLocked = ($assessment->semester == 1) ? $school->grading_locked_sem1 : $school->grading_locked_sem2;
+        if ($isLocked) return back()->with('error', 'الرصد لهذا الفصل مغلق حالياً 🔒');
         $maxScore = $assessment->max_score;
 
         foreach ($request->marks as $studentId => $score) {

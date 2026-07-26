@@ -64,12 +64,14 @@
         </div>
     </div>
 
-    @if(!empty($isLocked) && $isLocked)
-        <div class="alert alert-danger shadow-sm border-0 mb-4 animate__animated animate__fadeIn">
+    @if((!empty($school) && $school->grading_locked_sem1) || (!empty($school) && $school->grading_locked_sem2))
+        <div class="alert alert-warning shadow-sm border-0 mb-4 animate__animated animate__fadeIn">
             <div class="d-flex align-items-center">
                 <i class="fas fa-lock fa-lg me-3"></i>
                 <div>
-                    <strong>الرصد مغلق:</strong> لا يمكنك تعديل درجات النهائي حالياً بناءً على تعليمات الإدارة.
+                    <strong>حالة الرصد:</strong> 
+                    @if($school->grading_locked_sem1) رصد الفصل الأول مغلق. @endif
+                    @if($school->grading_locked_sem2) رصد الفصل الثاني مغلق. @endif
                 </div>
             </div>
         </div>
@@ -130,8 +132,8 @@
                                         <input type="number" step="0.5" min="0" max="{{ $maxFinalPerSem }}" 
                                             name="final_marks_sem1[{{ $student->id }}]" 
                                             value="{{ $studentScore->final_score_sem1 ?? '' }}" 
-                                            class="form-control text-center fw-bold fs-6 border-danger sem-input sem1-input {{ (!empty($isLocked) && $isLocked) ? 'bg-light' : '' }}" 
-                                            placeholder="-" {{ (!empty($isLocked) && $isLocked) ? 'readonly' : '' }}>
+                                            class="form-control text-center fw-bold fs-6 border-danger sem-input sem1-input {{ (!empty($school) && $school->grading_locked_sem1) ? 'bg-light' : '' }}" 
+                                            placeholder="-" {{ (!empty($school) && $school->grading_locked_sem1) ? 'readonly' : '' }}>
                                     </div>
                                 </td>
 
@@ -141,8 +143,8 @@
                                         <input type="number" step="0.5" min="0" max="{{ $maxFinalPerSem }}" 
                                             name="final_marks_sem2[{{ $student->id }}]" 
                                             value="{{ $studentScore->final_score_sem2 ?? '' }}" 
-                                            class="form-control text-center fw-bold fs-6 border-danger sem-input sem2-input {{ (!empty($isLocked) && $isLocked) ? 'bg-light' : '' }}" 
-                                            placeholder="-" {{ (!empty($isLocked) && $isLocked) ? 'readonly' : '' }}>
+                                            class="form-control text-center fw-bold fs-6 border-danger sem-input sem2-input {{ (!empty($school) && $school->grading_locked_sem2) ? 'bg-light' : '' }}" 
+                                            placeholder="-" {{ (!empty($school) && $school->grading_locked_sem2) ? 'readonly' : '' }}>
                                     </div>
                                 </td>
 
@@ -159,15 +161,15 @@
                 </div>
             </div>
             
-            @if(empty($isLocked) || !$isLocked)
+            @if(empty($school) || !$school->grading_locked_sem1 || !$school->grading_locked_sem2)
                 <div class="card-footer bg-white py-4 text-center border-top sticky-bottom shadow-sm">
                     <button type="submit" class="btn btn-danger px-5 py-2 fw-bold shadow hover-scale rounded-pill">
-                        <i class="fas fa-check-double me-2"></i> اعتماد الدرجات النهائية للفصلين
+                        <i class="fas fa-check-double me-2"></i> اعتماد الدرجات النهائية 
                     </button>
                 </div>
             @else
                 <div class="card-footer bg-light text-center py-3">
-                    <span class="text-muted small"><i class="fas fa-ban me-1"></i> الحفظ غير متاح حالياً</span>
+                    <span class="text-muted small"><i class="fas fa-ban me-1"></i> الحفظ غير متاح حالياً (كلا الفصلين مغلق)</span>
                 </div>
             @endif
         </div>

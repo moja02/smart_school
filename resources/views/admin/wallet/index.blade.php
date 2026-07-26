@@ -116,15 +116,24 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">اختر الطالب</label>
-                        <select name="student_id" class="form-select select2-purchase" style="width: 100%" required>
-                            <option value="">-- اختر --</option>
+                        <select name="student_id" id="purchase_student_select" class="form-select select2-purchase" style="width: 100%" required>
+                            <option value="" data-photo="">-- اختر --</option>
                             @foreach($students as $s)
                                 @if($s->studentProfile)
-                                <option value="{{ $s->studentProfile->id }}">{{ $s->name }} (رصيد: {{ number_format($s->studentProfile->wallet_balance ?? 0, 2) }})</option>
+                                <option value="{{ $s->studentProfile->id }}" data-photo="{{ $s->photo ? asset($s->photo) : 'https://ui-avatars.com/api/?name='.urlencode($s->name).'&background=random' }}">
+                                    {{ $s->name }} (رصيد: {{ number_format($s->studentProfile->wallet_balance ?? 0, 2) }})
+                                </option>
                                 @endif
                             @endforeach
                         </select>
                     </div>
+                    
+                    <!-- المعاينة الخاصة بصورة الطالب -->
+                    <div class="text-center mb-3 d-none" id="student_photo_preview_container">
+                        <img id="student_photo_preview" src="" alt="صورة الطالب" class="img-thumbnail rounded-circle shadow-sm" style="width: 120px; height: 120px; object-fit: cover;">
+                        <div class="mt-2 fw-bold text-primary" id="student_name_preview"></div>
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label">مبلغ المشتريات (دينار)</label>
                         <input type="number" step="0.5" min="0.5" name="amount" class="form-control" required placeholder="مثال: 2.5">
@@ -165,6 +174,21 @@
             dropdownParent: $('#purchaseModal'),
             placeholder: "ابحث باسم الطالب...",
             allowClear: true
+        });
+
+        // تحديث صورة الطالب عند اختياره في نافذة المقصف
+        $('#purchase_student_select').on('change', function() {
+            var selectedOption = $(this).find('option:selected');
+            var photoUrl = selectedOption.data('photo');
+            var studentName = selectedOption.text().split(' (')[0]; // الحصول على الاسم فقط
+
+            if (photoUrl) {
+                $('#student_photo_preview').attr('src', photoUrl);
+                $('#student_name_preview').text(studentName);
+                $('#student_photo_preview_container').removeClass('d-none');
+            } else {
+                $('#student_photo_preview_container').addClass('d-none');
+            }
         });
     });
 </script>

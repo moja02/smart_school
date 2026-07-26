@@ -1,0 +1,32 @@
+config:
+  target: "http://localhost:8000"
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: "Sustained load - 5 requests per second"
+    - duration: 30
+      arrivalRate: 20
+      name: "Spike - 20 requests per second (Concurrent purchases)"
+
+  payload:
+    # Use a CSV file with student_ids and tokens to simulate different managers/users
+    # path: "users.csv"
+    # fields:
+    #   - "auth_token"
+    #   - "student_id"
+
+scenarios:
+  - name: "Admin deducts wallet balance via API"
+    flow:
+      - post:
+          url: "/api/wallet/purchase" # Assuming API route
+          # headers:
+          #   Authorization: "Bearer {{ auth_token }}"
+          json:
+            student_id: 1 # Replace with dynamic {{ student_id }}
+            amount: 2.5
+            description: "Load test purchase"
+          capture:
+            - json: "$.status"
+              as: "status"
+      - log: "Request completed with status: {{ status }}"

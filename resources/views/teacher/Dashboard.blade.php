@@ -35,9 +35,13 @@
 
                 {{-- حالة نظام الرصد --}}
                 <div class="mt-3">
-                    @if($school->grading_locked)
+                    @if($school->grading_locked_sem1 && $school->grading_locked_sem2)
                         <span class="badge bg-danger p-2 shadow-sm">
-                            <i class="fas fa-lock me-1"></i> الرصد مغلق من الإدارة
+                            <i class="fas fa-lock me-1"></i> الرصد مغلق بالكامل
+                        </span>
+                    @elseif($school->grading_locked_sem1 || $school->grading_locked_sem2)
+                        <span class="badge bg-warning p-2 shadow-sm text-dark">
+                            <i class="fas fa-lock me-1"></i> الرصد مغلق جزئياً
                         </span>
                     @else
                         <span class="badge bg-success p-2 shadow-sm text-dark">

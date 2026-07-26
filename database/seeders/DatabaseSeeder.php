@@ -21,11 +21,44 @@ class DatabaseSeeder extends Seeder
     {
         $faker = Faker::create('ar_SA'); // بيانات عربية وهمية
 
+        // 0. إنشاء مدرسة لربط المستخدمين بها
+        $school = \App\Models\School::firstOrCreate(
+            ['id' => 1],
+            ['name' => 'المدرسة الذكية', 'academic_year' => '2026/2027']
+        );
+
+        // Permissions creation
+        $permissions = [
+            'toggle_grading',
+            'manage_users',
+            'manage_subjects',
+            'manage_classes',
+            'assign_teachers',
+            'edit_marks',
+            'manage_schedules',
+            'manage_reports',
+            'manage_promotion',
+            'manage_admissions',
+            'manage_fees',
+            'manage_leaves',
+            'manage_wallet',
+            'manage_wallet_charge',
+            'manage_wallet_sell',
+            'manage_accounting',
+            'manage_school'
+        ];
+        foreach ($permissions as $p) {
+            \Spatie\Permission\Models\Permission::firstOrCreate(['name' => $p, 'guard_name' => 'web']);
+        }
+
         // 1. إنشاء الأدوار (إذا لم تكن موجودة)
         $roleAdmin = Role::firstOrCreate(['name' => 'admin']);
         $roleTeacher = Role::firstOrCreate(['name' => 'teacher']);
         $roleStudent = Role::firstOrCreate(['name' => 'student']);
         $roleParent = Role::firstOrCreate(['name' => 'parent']);
+
+        // Give permissions to Admin
+        $roleAdmin->syncPermissions($permissions);
 
         // 2. إنشاء مدير النظام (Admin)
         if (!User::where('email', 'admin@school.com')->exists()) {
@@ -43,13 +76,15 @@ class DatabaseSeeder extends Seeder
         // 3. إنشاء المعلمين (10 معلمين)
         $teachers = [];
         for ($i = 1; $i <= 10; $i++) {
-            $teacher = User::create([
-                'name' => $faker->name,
-                'email' => "teacher$i@school.com",
-                'password' => Hash::make('password'),
-                'role' => 'teacher',
-                'school_id' => 1,
-            ]);
+            $teacher = User::firstOrCreate(
+                ['email' => "teacher$i@school.com"],
+                [
+                    'name' => $faker->name,
+                    'password' => Hash::make('password'),
+                    'role' => 'teacher',
+                    'school_id' => 1,
+                ]
+            );
             $teacher->assignRole($roleTeacher);
             $teachers[] = $teacher;
         }
@@ -58,13 +93,15 @@ class DatabaseSeeder extends Seeder
         // 4. إنشاء أولياء الأمور (20 ولي أمر)
         $parents = [];
         for ($i = 1; $i <= 20; $i++) {
-            $parent = User::create([
-                'name' => $faker->name,
-                'email' => "parent$i@school.com",
-                'password' => Hash::make('password'),
-                'role' => 'parent',
-                'school_id' => 1,
-            ]);
+            $parent = User::firstOrCreate(
+                ['email' => "parent$i@school.com"],
+                [
+                    'name' => $faker->name,
+                    'password' => Hash::make('password'),
+                    'role' => 'parent',
+                    'school_id' => 1,
+                ]
+            );
             $parent->assignRole($roleParent);
             $parents[] = $parent;
         }
@@ -75,8 +112,36 @@ class DatabaseSeeder extends Seeder
         $allSubjects = Subject::all();
 
         if ($grades->count() == 0) {
-            $this->command->error('❌ لا توجد مراحل دراسية! يرجى إضافتها أولاً.');
-            return;
+            $this->command->info('⏳ لا توجد مراحل دراسية، جاري إنشاء مراحل ومواد افتراضية...');
+            $gradeNames = ['الصف الأول الابتدائي', 'الصف الثاني الابتدائي', 'الصف الثالث الابتدائي'];
+            $subjectNames = ['اللغة العربية', 'الرياضيات', 'العلوم'];
+            
+            foreach ($gradeNames as $index => $gName) {
+                $grade = Grade::create([
+                    'name' => $gName,
+                    'stage' => 'primary',
+                    'order' => $index + 1
+                ]);
+                
+                // Link grade to school
+                DB::table('school_grade')->insert([
+                    'school_id' => 1,
+                    'grade_id' => $grade->id
+                ]);
+
+                foreach ($subjectNames as $sName) {
+                    Subject::create([
+                        'name' => $sName,
+                        'grade_id' => $grade->id,
+                        'school_id' => 1,
+                        'works_score' => 40,
+                        'final_score' => 60,
+                        'total_score' => 100
+                    ]);
+                }
+            }
+            $grades = Grade::all();
+            $allSubjects = Subject::all();
         }
 
         // 6. الحلقة الكبرى: إنشاء الفصول والطلاب والبيانات المرتبطة
@@ -109,12 +174,9 @@ class DatabaseSeeder extends Seeder
                     $student->assignRole($roleStudent);
 
                     // البروفايل
-                    StudentProfile::create([
+                    $profile = StudentProfile::create([
                         'user_id' => $student->id,
                         'class_id' => $class->id,
-                        'phone' => $faker->phoneNumber,
-                        'address' => $faker->address,
-                        'birth_date' => $faker->date('Y-m-d', '2015-01-01'),
                     ]);
 
                     // ربط الطالب بولي أمر عشوائي
@@ -146,7 +208,7 @@ class DatabaseSeeder extends Seeder
                     for ($day = 0; $day < 5; $day++) {
                         Attendance::create([
                             'user_id' => $student->id,
-                            'student_id' => $student->id, // البعض يستخدم هذا العمود
+                            'student_id' => $profile->id, // البعض يستخدم هذا العمود
                             'class_id' => $class->id,
                             'attendance_date' => now()->subDays($day)->format('Y-m-d'),
                             'status' => $faker->randomElement([1, 1, 1, 1, 0]), // 80% حضور (1)، 20% غياب (0)

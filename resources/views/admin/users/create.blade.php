@@ -13,7 +13,7 @@
 
             <div class="card shadow border-0 rounded-4">
                 <div class="card-body p-5">
-                    <form action="{{ route('admin.users.store') }}" method="POST">
+                    <form action="{{ route('admin.users.store') }}" method="POST" enctype="multipart/form-data">
                         @csrf
 
                         <div class="mb-3">
@@ -21,6 +21,14 @@
                             <div class="input-group">
                                 <span class="input-group-text bg-light"><i class="fas fa-user text-muted"></i></span>
                                 <input type="text" name="name" class="form-control" placeholder="أدخل الاسم الكامل" required>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">الصورة الشخصية (اختياري)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="fas fa-camera text-muted"></i></span>
+                                <input type="file" name="photo" class="form-control" accept="image/*">
                             </div>
                         </div>
 

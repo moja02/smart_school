@@ -1,0 +1,14 @@
+config:
+  target: "http://localhost:8000"
+  phases:
+    - duration: 60
+      arrivalRate: 20
+      name: "Parents viewing fee statements simultaneously"
+scenarios:
+  - name: "View Fees"
+    flow:
+      - get:
+          url: "/api/parent/fees"
+          capture:
+            - json: "$.status"
+              as: "status"

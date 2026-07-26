@@ -9,6 +9,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         
         body {
@@ -183,15 +184,27 @@
         
         @if($currentSchool && ($user->role === 'manager' || $user->hasPermissionTo('toggle_grading')))
         <div class="px-3 my-3">
-            <form action="{{ route('admin.grading.toggle') }}" method="POST">
+            <form action="{{ route('admin.grading.toggle', 1) }}" method="POST" class="mb-2">
                 @csrf
-                @if($currentSchool->grading_locked)
+                @if($currentSchool->grading_locked_sem1)
                     <button type="submit" class="btn btn-danger w-100 rounded-pill fw-bold shadow-sm d-flex justify-content-center align-items-center gap-2" style="font-size: 0.85rem;">
-                        <i class="fas fa-lock"></i> الرصد مغلق (فتح)
+                        <i class="fas fa-lock"></i> رصد ف1 مغلق (فتح)
                     </button>
                 @else
                     <button type="submit" class="btn btn-success w-100 rounded-pill fw-bold shadow-sm d-flex justify-content-center align-items-center gap-2" style="font-size: 0.85rem;">
-                        <i class="fas fa-unlock"></i> الرصد متاح (إغلاق)
+                        <i class="fas fa-unlock"></i> رصد ف1 متاح (إغلاق)
+                    </button>
+                @endif
+            </form>
+            <form action="{{ route('admin.grading.toggle', 2) }}" method="POST">
+                @csrf
+                @if($currentSchool->grading_locked_sem2)
+                    <button type="submit" class="btn btn-danger w-100 rounded-pill fw-bold shadow-sm d-flex justify-content-center align-items-center gap-2" style="font-size: 0.85rem;">
+                        <i class="fas fa-lock"></i> رصد ف2 مغلق (فتح)
+                    </button>
+                @else
+                    <button type="submit" class="btn btn-success w-100 rounded-pill fw-bold shadow-sm d-flex justify-content-center align-items-center gap-2" style="font-size: 0.85rem;">
+                        <i class="fas fa-unlock"></i> رصد ف2 متاح (إغلاق)
                     </button>
                 @endif
             </form>
@@ -304,7 +317,7 @@
 
         {{-- صلاحية التقارير --}}
         @if($user->role === 'manager' || $user->hasPermissionTo('manage_reports'))
-        <a href="{{ route('admin.reports.index') }}" class="{{ request()->routeIs('admin.reports*') ? 'active' : '' }}">
+        <a href="{{ route('admin.reports.advanced') }}" class="{{ request()->routeIs('admin.reports*') ? 'active' : '' }}">
             <i class="fas fa-chart-line"></i> التقارير والإحصائيات
         </a>
         @endif
@@ -413,7 +426,7 @@
                         return;
                     }
 
-                    fetch(`/admin/search?q=${encodeURIComponent(query)}`)
+                    fetch(`/users/search-global?q=${encodeURIComponent(query)}`)
                         .then(res => res.json())
                         .then(data => {
                             searchResults.innerHTML = '';
@@ -424,15 +437,18 @@
                                     li.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
                                     
                                     let badgeClass = 'bg-secondary';
-                                    if(item.role === 'student') badgeClass = 'bg-primary';
-                                    else if(item.role === 'teacher') badgeClass = 'bg-success';
-                                    else if(item.role === 'parent') badgeClass = 'bg-info text-dark';
+                                    let roleName = 'مستخدم';
+                                    if(item.role === 'student') { badgeClass = 'bg-primary'; roleName = 'طالب'; }
+                                    else if(item.role === 'teacher') { badgeClass = 'bg-success'; roleName = 'معلم'; }
+                                    else if(item.role === 'parent') { badgeClass = 'bg-info text-dark'; roleName = 'ولي أمر'; }
+                                    else if(item.role === 'manager') { badgeClass = 'bg-warning text-dark'; roleName = 'مدير مدرسة'; }
+                                    else if(item.role === 'admin') { badgeClass = 'bg-dark'; roleName = 'مشرف'; }
 
-                                    li.innerHTML = `<span><i class="fas fa-user-circle me-2 text-muted"></i> ${item.name}</span> <span class="badge ${badgeClass} rounded-pill">${item.role}</span>`;
+                                    li.innerHTML = `<span><i class="fas fa-user-circle me-2 text-muted"></i> ${item.name}</span> <span class="badge ${badgeClass} rounded-pill">${roleName}</span>`;
                                     
                                     li.style.cursor = 'pointer';
                                     li.addEventListener('click', () => {
-                                        window.location.href = `/admin/users/${item.id}/edit`;
+                                        window.location.href = `/messages/${item.id}`;
                                     });
 
                                     searchResults.appendChild(li);

@@ -71,7 +71,7 @@ class AuthTest extends TestCase
         ]);
 
         $this->assertGuest();
-        $response->assertSessionHasErrors(['email' => 'عذراً، هذا الحساب محظور من قبل الإدارة. يرجى مراجعة المدرسة.']);
+        $response->assertSessionHasErrors(['email' => 'عذراً، هذا الحساب محظور أو بانتظار تفعيل الإدارة. يرجى مراجعة المدرسة.']);
     }
 
     public function test_super_admin_redirected_to_system_schools(): void

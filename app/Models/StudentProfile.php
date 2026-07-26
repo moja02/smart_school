@@ -11,16 +11,6 @@ class StudentProfile extends Model
     protected $guarded = [];
 
     use HasFactory, LogsActivity;
-
-    protected $fillable = [
-        'user_id',
-        'class_id',
-        'total_fees',
-        'paid_fees',
-        'wallet_balance',
-        'daily_limit',
-        'wallet_pin',
-    ];
     // العلاقة مع المستخدم الأساسي (الاسم، الايميل..)
     public function user()
     {
@@ -34,6 +24,17 @@ class StudentProfile extends Model
     }
 
     // العلاقة مع أولياء الأمور تتم عبر موديل User والجدول الوسيط parent_student
+    public function parent()
+    {
+        return $this->hasOneThrough(
+            User::class,
+            ParentStudent::class,
+            'student_id',
+            'id',
+            'user_id',
+            'parent_id'
+        );
+    }
 
     public function assessmentMarks()
     {
@@ -53,8 +54,8 @@ class StudentProfile extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['user_id', 'class_id', 'total_fees', 'paid_fees'])
+            ->logOnly(['user_id', 'class_id', 'total_fees', 'paid_fees', 'wallet_balance', 'daily_limit'])
             ->logOnlyDirty()
-            ->useLogName('سجلات الطلاب الأكاديمية');
+            ->useLogName('سجلات الطلاب الأكاديمية والمحفظة');
     }
 }

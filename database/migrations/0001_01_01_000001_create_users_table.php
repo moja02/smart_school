@@ -16,7 +16,7 @@ return new class extends Migration {
             $table->date('birth_date')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->enum('role', ['admin', 'teacher', 'student', 'parent'])->default('student');
+            $table->enum('role', ['admin', 'teacher', 'student', 'parent', 'manager'])->default('student');
             $table->boolean('is_banned')->default(0);
             
             $table->foreignId('school_id')->nullable()->constrained('schools')->onDelete('cascade');

@@ -38,13 +38,16 @@
         </div>
     </div>
 
-    @if(!empty($isLocked) && $isLocked)
-        <div class="alert alert-danger shadow-sm border-0 mb-4 animate__animated animate__fadeIn">
+    @if((!empty($isLockedSem1) && $isLockedSem1) || (!empty($isLockedSem2) && $isLockedSem2))
+        <div class="alert alert-warning shadow-sm border-0 mb-4 animate__animated animate__fadeIn">
             <div class="d-flex align-items-center">
                 <i class="fas fa-lock fa-2x me-3"></i>
                 <div>
-                    <h5 class="fw-bold mb-1">نظام الرصد مغلق</h5>
-                    <p class="mb-0">لا يمكنك إضافة أو تعديل التقييمات بأمر من الإدارة.</p>
+                    <h5 class="fw-bold mb-1">نظام الرصد مقفل جزئياً أو كلياً</h5>
+                    <p class="mb-0">
+                        @if(!empty($isLockedSem1) && $isLockedSem1) رصد الفصل الأول مغلق. @endif
+                        @if(!empty($isLockedSem2) && $isLockedSem2) رصد الفصل الثاني مغلق. @endif
+                    </p>
                 </div>
             </div>
         </div>
@@ -74,13 +77,13 @@
 
                         <div class="mb-3">
                             <label class="form-label fw-bold small text-muted">اسم التقييم</label>
-                            <input type="text" name="name" class="form-control" placeholder="مثلاً: اختبار قصير 1" required {{ (!empty($isLocked) && $isLocked) ? 'disabled' : '' }}>
+                            <input type="text" name="name" class="form-control" placeholder="مثلاً: اختبار قصير 1" required>
                         </div>
 
                         {{-- اختيار السميستر (مربوط بالجافاسكريبت) --}}
                         <div class="mb-3">
                             <label class="form-label fw-bold small text-muted">الفصل الدراسي</label>
-                            <select name="semester" id="semesterSelect" class="form-select" required {{ (!empty($isLocked) && $isLocked) ? 'disabled' : '' }}>
+                            <select name="semester" id="semesterSelect" class="form-select" required>
                                 <option value="" disabled selected>-- حدد الفصل الدراسي --</option>
                                 <option value="1" data-rem="{{ $remSem1 ?? 0 }}">الأول (المتبقي: {{ $remSem1 ?? 0 }})</option>
                                 <option value="2" data-rem="{{ $remSem2 ?? 0 }}">الثاني (المتبقي: {{ $remSem2 ?? 0 }})</option>
@@ -143,7 +146,10 @@
                                                 <i class="fas fa-clipboard-list"></i>
                                             </a>
 
-                                            @if(empty($isLocked) || !$isLocked)
+                                            @php
+                                                $assessmentLocked = ($assessment->semester == 1) ? (!empty($isLockedSem1) && $isLockedSem1) : (!empty($isLockedSem2) && $isLockedSem2);
+                                            @endphp
+                                            @if(!$assessmentLocked)
                                                 <button type="button" class="btn btn-sm btn-outline-dark btn-edit-assessment" 
                                                     data-id="{{ $assessment->id }}"
                                                     data-name="{{ $assessment->name ?? $assessment->title }}"
@@ -216,7 +222,8 @@
 {{-- 💡 الجافاسكريبت للتفاعل الذكي --}}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const isLocked = {{ (!empty($isLocked) && $isLocked) ? 'true' : 'false' }};
+        const isLockedSem1 = {{ (!empty($isLockedSem1) && $isLockedSem1) ? 'true' : 'false' }};
+        const isLockedSem2 = {{ (!empty($isLockedSem2) && $isLockedSem2) ? 'true' : 'false' }};
         
         // 1. التفاعل مع اختيار السميستر والتحقق من الدرجة المسموحة
         const semesterSelect = document.getElementById('semesterSelect');
@@ -225,9 +232,17 @@
         const scoreWarning = document.getElementById('scoreWarning');
 
         function validateScore() {
-            if (isLocked) return;
             const selectedOption = semesterSelect.options[semesterSelect.selectedIndex];
             if (!selectedOption.value) return;
+            
+            const isLocked = (selectedOption.value == '1') ? isLockedSem1 : isLockedSem2;
+            if (isLocked) {
+                scoreWarning.innerHTML = `<span class="text-danger fw-bold"><i class="fas fa-lock me-1"></i> الرصد مغلق لهذا الفصل.</span>`;
+                submitBtn.disabled = true;
+                maxScoreInput.disabled = true;
+                maxScoreInput.classList.remove('border-danger');
+                return;
+            }
 
             const maxAllowed = parseFloat(selectedOption.getAttribute('data-rem')) || 0;
             const enteredScore = parseFloat(maxScoreInput.value) || 0;
@@ -249,8 +264,17 @@
 
         if (semesterSelect) {
             semesterSelect.addEventListener('change', function() {
-                if (isLocked) return;
                 const selectedOption = this.options[this.selectedIndex];
+                const isLocked = (selectedOption.value == '1') ? isLockedSem1 : isLockedSem2;
+                
+                if (isLocked) {
+                    maxScoreInput.disabled = true;
+                    maxScoreInput.value = '';
+                    scoreWarning.innerHTML = `<span class="text-danger fw-bold"><i class="fas fa-lock me-1"></i> الرصد مغلق لهذا الفصل.</span>`;
+                    submitBtn.disabled = true;
+                    return;
+                }
+                
                 const maxAllowed = parseFloat(selectedOption.getAttribute('data-rem')) || 0;
 
                 if (maxAllowed <= 0) {

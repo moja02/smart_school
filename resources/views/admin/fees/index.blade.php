@@ -24,18 +24,72 @@
         </div>
     @endif
 
+    <div class="card shadow border-0 mb-4">
+        <div class="card-body p-4">
+            <form action="{{ route('admin.fees.index') }}" method="GET" id="filterForm">
+                <div class="row g-3 align-items-end">
+                    
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-secondary">البحث بالإسم أو البريد:</label>
+                        <div class="input-group shadow-sm">
+                            <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
+                            <input type="text" name="search" class="form-control border-start-0" placeholder="ابحث عن طالب..." value="{{ $search ?? '' }}">
+                        </div>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-secondary">الصف الدراسي:</label>
+                        <div class="input-group shadow-sm">
+                            <span class="input-group-text bg-white border-end-0"><i class="fas fa-university text-primary"></i></span>
+                            <select name="grade_id" class="form-select border-start-0">
+                                <option value="">-- كل الصفوف --</option>
+                                @foreach($grades as $grade)
+                                    <option value="{{ $grade->id }}" {{ request('grade_id') == $grade->id ? 'selected' : '' }}>
+                                        {{ $grade->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-secondary">حالة السداد:</label>
+                        <div class="input-group shadow-sm">
+                            <span class="input-group-text bg-white border-end-0"><i class="fas fa-money-bill-wave text-success"></i></span>
+                            <select name="payment_status" class="form-select border-start-0">
+                                <option value="">-- الكل --</option>
+                                <option value="full" {{ request('payment_status') == 'full' ? 'selected' : '' }}>سدد بالكامل</option>
+                                <option value="partial" {{ request('payment_status') == 'partial' ? 'selected' : '' }}>تسديد جزئي</option>
+                                <option value="none" {{ request('payment_status') == 'none' ? 'selected' : '' }}>لم يسدد</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="col-md-3 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary flex-grow-1 shadow-sm fw-bold">
+                            <i class="fas fa-filter me-1"></i> تصفية
+                        </button>
+                        <a href="{{ route('admin.fees.index') }}" class="btn btn-outline-secondary shadow-sm" title="إعادة ضبط">
+                            <i class="fas fa-sync-alt"></i>
+                        </a>
+                    </div>
+
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex justify-content-between align-items-center">
             <h6 class="m-0 font-weight-bold text-primary">قائمة الطلاب والرسوم</h6>
-            <form class="form-inline" method="GET" action="{{ route('admin.fees.index') }}">
-                <div class="input-group">
-                    <input type="text" name="search" class="form-control bg-light border-0 small" placeholder="ابحث عن طالب..." value="{{ $search ?? '' }}">
-                    <div class="input-group-append">
-                        <button class="btn btn-primary" type="submit">
-                            <i class="fas fa-search fa-sm"></i> بحث
-                        </button>
-                    </div>
-                </div>
+            <form action="{{ route('admin.fees.notify') }}" method="POST" class="m-0" id="notifyForm">
+                @csrf
+                <input type="hidden" name="search" value="{{ request('search') }}">
+                <input type="hidden" name="grade_id" value="{{ request('grade_id') }}">
+                <input type="hidden" name="payment_status" value="{{ request('payment_status') }}">
+                <button type="button" id="notifyBtn" class="btn btn-warning btn-sm shadow-sm fw-bold">
+                    <i class="fas fa-bell me-1"></i> إرسال تنبيه للأولياء (المعروضين)
+                </button>
             </form>
         </div>
         <div class="card-body">
@@ -159,6 +213,7 @@
 @section('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Suspend buttons logic
     const suspendButtons = document.querySelectorAll('.btn-suspend');
     suspendButtons.forEach(btn => {
         btn.addEventListener('click', function(e) {
@@ -182,6 +237,30 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
+
+    // Notify button logic
+    const notifyBtn = document.getElementById('notifyBtn');
+    if (notifyBtn) {
+        notifyBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const form = document.getElementById('notifyForm');
+            
+            Swal.fire({
+                title: 'إرسال تنبيه جماعي',
+                text: 'هل أنت متأكد من إرسال رسالة تنبيه بخصوص الرسوم إلى جميع أولياء أمور الطلاب المعروضين في الجدول حالياً؟',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#ffc107',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'نعم، أرسل التنبيهات',
+                cancelButtonText: 'إلغاء'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    form.submit();
+                }
+            });
+        });
+    }
 });
 </script>
 @endsection

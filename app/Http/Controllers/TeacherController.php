@@ -144,7 +144,8 @@ class TeacherController extends Controller
     // 2. دالة حفظ الدرجة
     public function storeGrades(Request $request)
 {
-    $isLocked = \DB::table('schools')->where('id', auth()->user()->school_id)->value('grading_locked');
+    $school = \DB::table('schools')->where('id', auth()->user()->school_id)->first();
+    $isLocked = $school->grading_locked_sem1 && $school->grading_locked_sem2;
     
     if ($isLocked) {
         return back()->with('error', 'عذراً، تم إغلاق باب رصد الدرجات من قبل الإدارة. لا يمكن التعديل حالياً.');
@@ -188,7 +189,7 @@ class TeacherController extends Controller
     {
         $teacherId = auth()->user()->id;
         $schoolId = auth()->user()->school_id;
-        $isLocked = \DB::table('schools')->where('id', $schoolId)->value('grading_locked');
+        $school = \DB::table('schools')->where('id', $schoolId)->first();
 
         // جلب البيانات الأساسية
         $subject = \DB::table('subjects')->find($subjectId);
@@ -223,25 +224,29 @@ class TeacherController extends Controller
 
         return view('teacher.assessments.final_edit', compact(
             'subject', 'section', 'grade', 'students', 'scores', 
-            'isLocked', 'maxFinal', 'maxFinalPerSem'
+            'school', 'maxFinal', 'maxFinalPerSem'
         ));
     }
 
     public function storeFinalGrades(Request $request)
     {
-        $isLocked = \DB::table('schools')->where('id', auth()->user()->school_id)->value('grading_locked');
-        if ($isLocked) return back()->with('error', 'الرصد مغلق حالياً 🔒');
-
         $schoolId = auth()->user()->school_id;
+        $school = \DB::table('schools')->where('id', $schoolId)->first();
 
         // الدوران على درجات الفصل الأول (التي تحتوي على أرقام الطلاب كـ Keys)
         foreach ($request->final_marks_sem1 as $studentId => $markSem1) {
             
-            // جلب درجة الفصل الثاني لنفس الطالب
-            $markSem2 = $request->final_marks_sem2[$studentId] ?? 0;
+            $currentScore = \DB::table('student_scores')
+                ->where('student_id', $studentId)
+                ->where('subject_id', $request->subject_id)
+                ->where('class_id', $request->section_id)
+                ->first();
+
+            $final1 = $school->grading_locked_sem1 ? ($currentScore->final_score_sem1 ?? 0) : ($markSem1 ?? 0);
+            $final2 = $school->grading_locked_sem2 ? ($currentScore->final_score_sem2 ?? 0) : ($request->final_marks_sem2[$studentId] ?? 0);
             
             // حساب المجموع النهائي
-            $totalFinal = floatval($markSem1 ?? 0) + floatval($markSem2 ?? 0);
+            $totalFinal = floatval($final1) + floatval($final2);
 
             \DB::table('student_scores')->updateOrInsert(
                 [
@@ -251,10 +256,9 @@ class TeacherController extends Controller
                 ],
                 [
                     'school_id' => $schoolId,
-                    'final_score_sem1' => $markSem1 ?? 0, // درجة الفصل الأول
-                    'final_score_sem2' => $markSem2 ?? 0, // درجة الفصل الثاني
+                    'final_score_sem1' => $final1, // درجة الفصل الأول
+                    'final_score_sem2' => $final2, // درجة الفصل الثاني
                     'final_score'      => $totalFinal,    // المجموع الكلي للنهائي
-                    'created_at' => now(),
                     'updated_at' => now(),
                 ]
             );
@@ -499,10 +503,12 @@ class TeacherController extends Controller
         // 4. استخراج الرصيد المتبقي الكلي
         $remainingScore = max(0, $totalWorksScore - $currentTotalSum);
 
-        $isLocked = \DB::table('schools')->where('id', $schoolId)->value('grading_locked');
+        $school = \DB::table('schools')->where('id', $schoolId)->first();
+        $isLockedSem1 = $school->grading_locked_sem1;
+        $isLockedSem2 = $school->grading_locked_sem2;
 
         return view('teacher.assessments.index', compact(
-            'subject', 'class', 'assessments', 'isLocked', 
+            'subject', 'class', 'assessments', 'isLockedSem1', 'isLockedSem2', 
             'totalWorksScore', 'remainingScore', 'currentTotalSum'
         ));
     }
@@ -1186,5 +1192,101 @@ public function myWeeklySchedule()
         ]);
 
         return redirect()->back()->with('success', 'تمت إضافة السؤال بنجاح.');
+    }
+
+    // ==========================================
+    // المذكرات والملفات الدراسية (Study Materials)
+    // ==========================================
+
+    /**
+     * عرض صفحة إدارة الملفات الدراسية لمادة وفصل معين
+     */
+    public function materialsIndex($subject_id, $section_id)
+    {
+        $teacher = auth()->user();
+        $subject = Subject::findOrFail($subject_id);
+        $class = SchoolClass::findOrFail($section_id);
+
+        // التحقق من أن المعلم مسند فعلاً لهذه المادة في هذا الفصل
+        $isAssigned = DB::table('teacher_subject_section')
+            ->where('teacher_id', $teacher->id)
+            ->where('subject_id', $subject_id)
+            ->where('section_id', $section_id)
+            ->exists();
+
+        if (!$isAssigned) {
+            return redirect()->back()->with('error', 'ليس لديك صلاحية إدارة ملفات هذه المادة.');
+        }
+
+        $materials = \App\Models\StudyMaterial::where('subject_id', $subject_id)
+            ->where('section_id', $section_id)
+            ->where('teacher_id', $teacher->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return view('teacher.materials.index', compact('subject', 'class', 'materials'));
+    }
+
+    /**
+     * رفع ملف دراسي جديد
+     */
+    public function storeMaterial(Request $request, $subject_id, $section_id)
+    {
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string|max:1000',
+            'file' => 'required|file|max:20480|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,txt,jpg,jpeg,png,gif,zip,rar,mp4,mp3',
+        ], [
+            'title.required' => 'يرجى إدخال عنوان الملف.',
+            'file.required' => 'يرجى اختيار ملف للرفع.',
+            'file.max' => 'الحد الأقصى لحجم الملف هو 20 ميجابايت.',
+            'file.mimes' => 'نوع الملف غير مدعوم. الأنواع المسموحة: PDF, Word, Excel, PowerPoint, صور, مقاطع فيديو, مضغوط.',
+        ]);
+
+        $teacher = auth()->user();
+
+        // رفع الملف إلى مجلد storage/app/public/materials
+        $file = $request->file('file');
+        $originalName = $file->getClientOriginalName();
+        $extension = $file->getClientOriginalExtension();
+        $fileSize = $file->getSize();
+
+        // تسمية فريدة للملف لمنع التكرار
+        $storedPath = $file->store('materials/' . $teacher->school_id, 'public');
+
+        \App\Models\StudyMaterial::create([
+            'teacher_id' => $teacher->id,
+            'subject_id' => $subject_id,
+            'section_id' => $section_id,
+            'school_id'  => $teacher->school_id,
+            'title'      => $request->title,
+            'description'=> $request->description,
+            'file_path'  => $storedPath,
+            'file_name'  => $originalName,
+            'file_type'  => strtolower($extension),
+            'file_size'  => $fileSize,
+        ]);
+
+        return redirect()->back()->with('success', 'تم رفع الملف بنجاح ✅');
+    }
+
+    /**
+     * حذف ملف دراسي
+     */
+    public function deleteMaterial($id)
+    {
+        $teacher = auth()->user();
+        $material = \App\Models\StudyMaterial::where('id', $id)
+            ->where('teacher_id', $teacher->id)
+            ->firstOrFail();
+
+        // حذف الملف من التخزين
+        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($material->file_path)) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($material->file_path);
+        }
+
+        $material->delete();
+
+        return redirect()->back()->with('success', 'تم حذف الملف بنجاح 🗑️');
     }
 }

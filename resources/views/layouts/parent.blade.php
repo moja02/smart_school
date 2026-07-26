@@ -6,6 +6,7 @@
     <title>بوابة ولي الأمر - Smart School</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { background-color: #f4f6f9; font-family: "Tahoma", Arial, sans-serif; }
         .page-header-card { background: linear-gradient(135deg, #3a6073, #16222a); border-radius: 1rem; color: white; padding: 2rem; border: none; }
@@ -23,7 +24,11 @@
         <div class="text-center mb-4 fs-4 fw-bold text-white">Smart School 🎓</div>
         
         <a href="{{ route('parent.dashboard') }}" class="{{ request()->routeIs('parent.dashboard') ? 'active' : '' }}">
-            <i class="fas fa-home"></i> الرئيسية (الأبناء)
+            <i class="fas fa-home"></i> الرئيسية (لوحة التحكم)
+        </a>
+
+        <a href="{{ route('parent.children') }}" class="{{ request()->routeIs('parent.children') || request()->routeIs('parent.reports.*') ? 'active' : '' }}">
+            <i class="fas fa-users"></i> بيانات الأبناء والتقارير
         </a>
 
         <a class="dropdown-item" href="{{ route('profile.edit') }}">
