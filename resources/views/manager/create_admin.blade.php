@@ -16,18 +16,6 @@
 
 <div class="row justify-content-center">
     <div class="col-lg-8">
-        
-        {{-- تنبيه بوجود مسؤول حالي --}}
-        @if(isset($currentOfficer) && $currentOfficer)
-            <div class="alert alert-warning d-flex align-items-center shadow-sm border-0 border-start border-4 border-warning mb-4">
-                <i class="fas fa-exclamation-triangle fa-2x me-3 opacity-50"></i>
-                <div>
-                    <h6 class="fw-bold mb-1">انتبه: يوجد مسؤول حالي للنظام!</h6>
-                    <p class="mb-0 small">الاسم: <strong>{{ $currentOfficer->name }}</strong> | البريد: {{ $currentOfficer->email }}</p>
-                    <small class="text-muted">إنشاء حساب جديد قد يسبب تداخل في الصلاحيات إذا لم يتم حذف القديم.</small>
-                </div>
-            </div>
-        @endif
 
         @if(session('success'))
             <div class="alert alert-success shadow-sm border-0 border-start border-4 border-success mb-4">

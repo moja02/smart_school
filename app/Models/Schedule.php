@@ -15,6 +15,7 @@ class Schedule extends Model
         'teacher_id', // تأكد من وجود هذا الحقل في قاعدة البيانات
         'day',
         'period',
+        'is_backup',
     ];
 
     public function schoolClass()

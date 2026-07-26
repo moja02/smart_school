@@ -41,14 +41,15 @@
                                 <dd class="col-sm-8">{{ $child->gender ?? '-' }}</dd>
                             </dl>
 
-                            <div class="mt-3 d-flex gap-2">
-                                <a href="{{ route('parent.grades') }}"
-                                   class="btn btn-outline-primary btn-sm">
-                                    عرض الدرجات
+                            <div class="mt-3 d-flex flex-wrap gap-2">
+                                <a href="{{ route('parent.reports.certificate', $child->user_id ?? $child->id) }}" class="btn btn-primary btn-sm rounded-pill shadow-sm">
+                                    <i class="fas fa-certificate"></i> الشهادة التفصيلية
                                 </a>
-                                <a href="{{ route('parent.attendance') }}"
-                                   class="btn btn-outline-success btn-sm">
-                                    متابعة الحضور
+                                <a href="{{ route('parent.reports.progress', $child->user_id ?? $child->id) }}" class="btn btn-info text-white btn-sm rounded-pill shadow-sm">
+                                    <i class="fas fa-chart-line"></i> المنحنى الأكاديمي
+                                </a>
+                                <a href="{{ route('parent.reports.discipline', $child->user_id ?? $child->id) }}" class="btn btn-danger btn-sm rounded-pill shadow-sm">
+                                    <i class="fas fa-clipboard-check"></i> الانضباط والغياب
                                 </a>
                             </div>
                         </div>

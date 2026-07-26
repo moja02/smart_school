@@ -26,10 +26,10 @@
                     @csrf
                     
                     {{-- اختيار ولي الأمر --}}
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">1. اختر ولي الأمر</label>
-                        <select name="parent_id" class="form-select form-select-lg shadow-sm" required>
-                            <option value="" disabled selected>-- القائمة --</option>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-dark"><i class="fas fa-user-tie me-1"></i> 1. اختر ولي الأمر</label>
+                        <select name="parent_id" class="form-select select2-parent" required>
+                            <option value="" disabled selected>-- ابحث عن ولي الأمر (الاسم أو الإيميل) --</option>
                             @foreach($parents as $parent)
                                 <option value="{{ $parent->id }}">{{ $parent->name }} ({{ $parent->email }})</option>
                             @endforeach
@@ -37,25 +37,28 @@
                     </div>
 
                     {{-- اختيار الطلاب (المحدث) --}}
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">2. اختر الأبناء (الطلاب غير المرتبطين)</label>
-                        <select name="student_ids[]" class="form-select shadow-sm" multiple style="height: 200px;" required {{ $students->isEmpty() ? 'disabled' : '' }}>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-dark"><i class="fas fa-user-graduate me-1"></i> 2. اختر الأبناء (الطلاب غير المرتبطين)</label>
+                        <select name="student_ids[]" class="form-select select2-students" multiple required {{ $students->isEmpty() ? 'disabled' : '' }}>
                             @forelse($students as $student)
-                                <option value="{{ $student->id }}" class="p-2 border-bottom">
+                                <option value="{{ $student->id }}">
                                     {{ $student->name }} 
                                     @if($student->studentProfile && $student->studentProfile->class)
                                         - ({{ $student->studentProfile->class->name }})
                                     @endif
                                 </option>
                             @empty
-                                <option disabled class="text-success fw-bold text-center mt-4" style="background: transparent;">
-                                    ✅ جميع الطلاب في النظام مرتبطون حالياً.
-                                </option>
                             @endforelse
                         </select>
-                        <div class="form-text text-primary mt-2">
-                            <i class="fas fa-mouse-pointer"></i> اضغط باستمرار على زر <b>Ctrl</b> (أو Command) لتحديد عدة طلاب في آن واحد.
-                        </div>
+                        @if($students->isEmpty())
+                            <div class="alert alert-success mt-2 mb-0 py-2 small">
+                                <i class="fas fa-check-circle"></i> جميع الطلاب في النظام مرتبطون حالياً بآبائهم.
+                            </div>
+                        @else
+                            <div class="form-text text-muted mt-2">
+                                <i class="fas fa-info-circle"></i> يمكنك البحث واختيار أكثر من طالب في نفس الوقت.
+                            </div>
+                        @endif
                     </div>
 
                     <hr>
@@ -190,5 +193,36 @@
             });
         });
     });
+
+    // تفعيل Select2
+    $(document).ready(function() {
+        $('.select2-parent').select2({
+            placeholder: "-- ابحث عن ولي الأمر (الاسم أو الإيميل) --",
+            allowClear: true,
+            theme: "classic" // او bootstrap-5 اذا كانت المكتبة مضمنة
+        });
+        
+        $('.select2-students').select2({
+            placeholder: "-- اختر الأبناء (ابحث بالاسم) --",
+            allowClear: true
+        });
+    });
 </script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<style>
+    .select2-container .select2-selection--single, .select2-container .select2-selection--multiple {
+        border-color: #dee2e6;
+        min-height: 42px;
+        border-radius: 0.375rem;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 40px;
+        padding-right: 15px;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 40px;
+    }
+</style>
 @endsection

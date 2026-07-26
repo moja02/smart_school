@@ -155,8 +155,13 @@ class StudentController extends Controller
                         ? $subject->getGradeDistribution() 
                         : ['works' => 40, 'final' => 60, 'total' => 100];
 
-        // 3. جلب جميع التقييمات التي أضافها الأستاذ لهذه المادة
-        $assessments = \App\Models\Assessment::where('subject_id', $id)->get();
+        // 3. جلب جميع التقييمات التي أضافها الأستاذ لهذه المادة في شعبة الطالب فقط
+        $sectionId = $student ? $student->class_id : null;
+        $assessments = \App\Models\Assessment::where('subject_id', $id)
+                        ->when($sectionId, function($q) use ($sectionId) {
+                            $q->where('section_id', $sectionId);
+                        })
+                        ->get();
         
         $worksTotal = 0;
         $finalTotal = 0;
@@ -166,8 +171,7 @@ class StudentController extends Controller
         // دمج درجة الطالب مع كل تقييم
         foreach ($assessments as $assessment) {
             if ($student) {
-                // البحث عن درجة الطالب في هذا التقييم تحديداً
-                $markRecord = AssessmentMark::where('student_id', $student->id)
+                $markRecord = AssessmentMark::where('student_id', $user->id)
                                             ->where('assessment_id', $assessment->id)
                                             ->first();
                                             
@@ -195,9 +199,15 @@ class StudentController extends Controller
         $studentTotal = $worksTotal + $finalTotal;
         $percentage = $maxPossibleTotal > 0 ? round(($studentTotal / $maxPossibleTotal) * 100, 1) : 0;
 
+        // 4. جلب الملفات الدراسية المتاحة لهذه المادة وهذا الفصل
+        $materials = \App\Models\StudyMaterial::where('subject_id', $id)
+            ->where('section_id', $sectionId)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         return view('student.subjects.show', compact(
             'subject', 'lessons', 'distribution', 'assessments', 
-            'worksTotal', 'finalTotal', 'studentTotal', 'percentage'
+            'worksTotal', 'finalTotal', 'studentTotal', 'percentage', 'materials'
         ));
     }
 
@@ -426,6 +436,11 @@ class StudentController extends Controller
     /**
      * عرض جدول الامتحانات (الـ 30 يوماً القادمة)
      */
+    public function examsIndex()
+    {
+        return view('student.exams.index');
+    }
+
     public function examsCalendar()
     {
         $user = auth()->user();
@@ -473,5 +488,115 @@ class StudentController extends Controller
         }
 
         return view('student.exams', compact('calendarDays', 'exams'));
+    }
+
+    // ==========================================
+    // الاختبارات الإلكترونية (Online Exams)
+    // ==========================================
+
+    public function onlineExams()
+    {
+        $user = auth()->user();
+        $studentProfile = \App\Models\StudentProfile::where('user_id', $user->id)->first();
+        $class_id = $studentProfile->class_id ?? $studentProfile->section_id ?? null;
+
+        if (!$class_id) {
+            return redirect()->route('student.dashboard')->with('error', 'أنت لست مسجلاً في فصل دراسي بعد.');
+        }
+
+        $exams = \App\Models\OnlineExam::with(['subject', 'teacher'])
+                    ->where('class_id', $class_id)
+                    ->where('is_active', true)
+                    ->orderBy('created_at', 'desc')
+                    ->get();
+
+        // Check if student already attempted
+        foreach($exams as $exam) {
+            $exam->my_attempt = \App\Models\OnlineExamAttempt::where('online_exam_id', $exam->id)
+                                ->where('student_id', $user->id)
+                                ->first();
+        }
+
+        return view('student.online_exams.index', compact('exams'));
+    }
+
+    public function takeOnlineExam($id)
+    {
+        $user = auth()->user();
+        $exam = \App\Models\OnlineExam::with('questions')->findOrFail($id);
+
+        $attempt = \App\Models\OnlineExamAttempt::where('online_exam_id', $id)
+                        ->where('student_id', $user->id)
+                        ->first();
+
+        if ($attempt) {
+            return redirect()->route('student.online_exams.index')->with('error', 'لقد قمت بأداء هذا الاختبار مسبقاً.');
+        }
+
+        return view('student.online_exams.take', compact('exam'));
+    }
+
+    public function submitOnlineExam(Request $request, $id)
+    {
+        $user = auth()->user();
+        $exam = \App\Models\OnlineExam::with('questions')->findOrFail($id);
+
+        if (\App\Models\OnlineExamAttempt::where('online_exam_id', $id)->where('student_id', $user->id)->exists()) {
+            return redirect()->route('student.online_exams.index')->with('error', 'لقد قمت بأداء هذا الاختبار مسبقاً.');
+        }
+
+        $score = 0;
+        $studentAnswers = [];
+
+        foreach ($exam->questions as $question) {
+            $userAnswer = $request->input('q_' . $question->id);
+            $isCorrect = ($userAnswer == $question->correct_answer);
+
+            if ($isCorrect) {
+                $score += $question->score;
+            }
+
+            $studentAnswers[$question->id] = [
+                'user_answer' => $userAnswer,
+                'is_correct' => $isCorrect,
+            ];
+        }
+
+        \App\Models\OnlineExamAttempt::create([
+            'online_exam_id' => $exam->id,
+            'student_id' => $user->id,
+            'student_answers' => $studentAnswers,
+            'total_score' => $score,
+            'started_at' => now(), // Ideally this would be set when they click "start", but this is a simplified flow
+            'finished_at' => now(),
+            'status' => 'completed',
+        ]);
+
+        return redirect()->route('student.online_exams.index')->with('success', "تم تسليم الاختبار! نتيجتك: $score");
+    }
+
+    /**
+     * تحميل ملف دراسي
+     */
+    public function downloadMaterial($id)
+    {
+        $user = auth()->user();
+        $studentProfile = StudentProfile::where('user_id', $user->id)->first();
+        
+        if (!$studentProfile || !$studentProfile->class_id) {
+            return redirect()->back()->with('error', 'يجب أن تكون مسجلاً في فصل دراسي.');
+        }
+
+        $material = \App\Models\StudyMaterial::where('id', $id)
+            ->where('section_id', $studentProfile->class_id)
+            ->firstOrFail();
+
+        $filePath = storage_path('app/public/' . $material->file_path);
+
+        if (!file_exists($filePath)) {
+            return redirect()->back()->with('error', 'عذراً، الملف غير موجود.');
+        }
+
+        return response()->download($filePath, $material->file_name);
     }
 }

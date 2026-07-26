@@ -130,4 +130,28 @@ class MessageController extends Controller
 
         return back(); // إعادة توجيه لنفس الصفحة لرؤية الرسالة
     }
+
+    // 4. بحث عام في الشريط العلوي (Global Search)
+    public function searchGlobal(Request $request)
+    {
+        $query = $request->input('q');
+        if (!$query || strlen($query) < 2) {
+            return response()->json([]);
+        }
+
+        // جلب المستخدمين المسموح بمراسلتهم فقط (حسب الصلاحية)
+        $allowedUsers = $this->getAllowedUsers();
+        $allowedIds = $allowedUsers->pluck('id');
+
+        $users = User::whereIn('id', $allowedIds)
+            ->where(function($q) use ($query) {
+                $q->where('name', 'LIKE', "%{$query}%")
+                  ->orWhere('email', 'LIKE', "%{$query}%");
+            })
+            ->select('id', 'name', 'role')
+            ->limit(10)
+            ->get();
+
+        return response()->json($users);
+    }
 }

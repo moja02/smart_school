@@ -1,0 +1,434 @@
+{
+    "teachers": [
+        {
+            "name": "2",
+            "unwanted_slots": {
+                "Sun": [
+                    "6"
+                ],
+                "Mon": [
+                    "2"
+                ],
+                "Tue": [
+                    "2"
+                ],
+                "Wed": [
+                    "2"
+                ],
+                "Thu": [
+                    "2"
+                ]
+            }
+        },
+        {
+            "name": "3",
+            "unwanted_slots": {
+                "Sun": [
+                    "1"
+                ],
+                "Mon": [
+                    "1"
+                ],
+                "Tue": [
+                    "1"
+                ],
+                "Wed": [
+                    "1"
+                ],
+                "Thu": [
+                    "1"
+                ]
+            }
+        },
+        {
+            "name": "4",
+            "unwanted_slots": []
+        },
+        {
+            "name": "5",
+            "unwanted_slots": {
+                "Wed": [
+                    "3"
+                ]
+            }
+        },
+        {
+            "name": "6",
+            "unwanted_slots": {
+                "Tue": [
+                    "6",
+                    "7"
+                ],
+                "Thu": [
+                    "6",
+                    "7"
+                ]
+            }
+        },
+        {
+            "name": "7",
+            "unwanted_slots": {
+                "Wed": [
+                    "6",
+                    "7"
+                ],
+                "Thu": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7
+                ]
+            }
+        },
+        {
+            "name": "8",
+            "unwanted_slots": {
+                "Thu": [
+                    "7"
+                ]
+            }
+        },
+        {
+            "name": "9",
+            "unwanted_slots": {
+                "Sun": [
+                    "6",
+                    "7"
+                ],
+                "Mon": [
+                    "6",
+                    "7"
+                ],
+                "Tue": [
+                    "6",
+                    "7"
+                ],
+                "Wed": [
+                    "6",
+                    "7"
+                ],
+                "Thu": [
+                    "6",
+                    "7"
+                ]
+            }
+        },
+        {
+            "name": "10",
+            "unwanted_slots": {
+                "Thu": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7
+                ]
+            }
+        },
+        {
+            "name": "11",
+            "unwanted_slots": {
+                "Sun": [
+                    "7"
+                ]
+            }
+        },
+        {
+            "name": "165",
+            "unwanted_slots": []
+        },
+        {
+            "name": "166",
+            "unwanted_slots": []
+        }
+    ],
+    "requirements": [
+        {
+            "class": "26",
+            "subject": "1",
+            "teacher": "2",
+            "sessions": 3
+        },
+        {
+            "class": "26",
+            "subject": "3",
+            "teacher": "3",
+            "sessions": 5
+        },
+        {
+            "class": "26",
+            "subject": "2",
+            "teacher": "9",
+            "sessions": 5
+        },
+        {
+            "class": "26",
+            "subject": "4",
+            "teacher": "10",
+            "sessions": 3
+        },
+        {
+            "class": "26",
+            "subject": "5",
+            "teacher": "10",
+            "sessions": 3
+        },
+        {
+            "class": "26",
+            "subject": "6",
+            "teacher": "6",
+            "sessions": 5
+        },
+        {
+            "class": "26",
+            "subject": "7",
+            "teacher": "5",
+            "sessions": 4
+        },
+        {
+            "class": "26",
+            "subject": "85",
+            "teacher": "9",
+            "sessions": 2
+        },
+        {
+            "class": "27",
+            "subject": "1",
+            "teacher": "9",
+            "sessions": 3
+        },
+        {
+            "class": "27",
+            "subject": "2",
+            "teacher": "8",
+            "sessions": 5
+        },
+        {
+            "class": "27",
+            "subject": "4",
+            "teacher": "8",
+            "sessions": 3
+        },
+        {
+            "class": "27",
+            "subject": "3",
+            "teacher": "11",
+            "sessions": 5
+        },
+        {
+            "class": "27",
+            "subject": "5",
+            "teacher": "6",
+            "sessions": 3
+        },
+        {
+            "class": "27",
+            "subject": "6",
+            "teacher": "5",
+            "sessions": 5
+        },
+        {
+            "class": "27",
+            "subject": "7",
+            "teacher": "10",
+            "sessions": 4
+        },
+        {
+            "class": "27",
+            "subject": "85",
+            "teacher": "4",
+            "sessions": 2
+        },
+        {
+            "class": "39",
+            "subject": "1",
+            "teacher": "10",
+            "sessions": 3
+        },
+        {
+            "class": "39",
+            "subject": "2",
+            "teacher": "9",
+            "sessions": 5
+        },
+        {
+            "class": "39",
+            "subject": "3",
+            "teacher": "11",
+            "sessions": 5
+        },
+        {
+            "class": "39",
+            "subject": "4",
+            "teacher": "3",
+            "sessions": 3
+        },
+        {
+            "class": "39",
+            "subject": "5",
+            "teacher": "6",
+            "sessions": 3
+        },
+        {
+            "class": "39",
+            "subject": "6",
+            "teacher": "5",
+            "sessions": 5
+        },
+        {
+            "class": "39",
+            "subject": "7",
+            "teacher": "10",
+            "sessions": 4
+        },
+        {
+            "class": "39",
+            "subject": "85",
+            "teacher": "4",
+            "sessions": 2
+        },
+        {
+            "class": "29",
+            "subject": "43",
+            "teacher": "165",
+            "sessions": 2
+        },
+        {
+            "class": "29",
+            "subject": "44",
+            "teacher": "166",
+            "sessions": 5
+        },
+        {
+            "class": "29",
+            "subject": "45",
+            "teacher": "8",
+            "sessions": 5
+        },
+        {
+            "class": "29",
+            "subject": "46",
+            "teacher": "3",
+            "sessions": 4
+        },
+        {
+            "class": "29",
+            "subject": "47",
+            "teacher": "10",
+            "sessions": 2
+        },
+        {
+            "class": "29",
+            "subject": "48",
+            "teacher": "4",
+            "sessions": 5
+        },
+        {
+            "class": "29",
+            "subject": "49",
+            "teacher": "3",
+            "sessions": 3
+        },
+        {
+            "class": "29",
+            "subject": "86",
+            "teacher": "7",
+            "sessions": 4
+        },
+        {
+            "class": "30",
+            "subject": "44",
+            "teacher": "166",
+            "sessions": 5
+        },
+        {
+            "class": "30",
+            "subject": "45",
+            "teacher": "8",
+            "sessions": 5
+        },
+        {
+            "class": "30",
+            "subject": "46",
+            "teacher": "3",
+            "sessions": 4
+        },
+        {
+            "class": "30",
+            "subject": "47",
+            "teacher": "10",
+            "sessions": 2
+        },
+        {
+            "class": "30",
+            "subject": "48",
+            "teacher": "4",
+            "sessions": 5
+        },
+        {
+            "class": "30",
+            "subject": "49",
+            "teacher": "3",
+            "sessions": 3
+        },
+        {
+            "class": "30",
+            "subject": "86",
+            "teacher": "7",
+            "sessions": 4
+        },
+        {
+            "class": "31",
+            "subject": "43",
+            "teacher": "165",
+            "sessions": 2
+        },
+        {
+            "class": "31",
+            "subject": "44",
+            "teacher": "5",
+            "sessions": 5
+        },
+        {
+            "class": "31",
+            "subject": "45",
+            "teacher": "8",
+            "sessions": 5
+        },
+        {
+            "class": "31",
+            "subject": "46",
+            "teacher": "3",
+            "sessions": 4
+        },
+        {
+            "class": "31",
+            "subject": "47",
+            "teacher": "11",
+            "sessions": 2
+        },
+        {
+            "class": "31",
+            "subject": "48",
+            "teacher": "4",
+            "sessions": 5
+        },
+        {
+            "class": "31",
+            "subject": "49",
+            "teacher": "3",
+            "sessions": 3
+        },
+        {
+            "class": "31",
+            "subject": "86",
+            "teacher": "7",
+            "sessions": 4
+        }
+    ]
+}

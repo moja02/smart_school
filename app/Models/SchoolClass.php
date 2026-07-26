@@ -31,7 +31,7 @@ class SchoolClass extends Model
 
     public function schedules()
     {
-        return $this->hasMany(Schedule::class, 'class_id');
+        return $this->hasMany(Schedule::class, 'class_id')->where('is_backup', 0);
     }
     public function grade()
     {

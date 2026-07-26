@@ -11,7 +11,8 @@
 
     {{-- فحص حالة القفل --}}
     @php
-        $isLocked = \DB::table('schools')->where('id', auth()->user()->school_id)->value('grading_locked');
+        $school = \DB::table('schools')->where('id', auth()->user()->school_id)->first();
+        $isLocked = $school->grading_locked_sem1 && $school->grading_locked_sem2;
     @endphp
 
     {{-- 1. الترويسة الرئيسية (النمط الداكن المعتمد) --}}
@@ -98,10 +99,18 @@
                 </div>
 
                 {{-- 5. زر النهائي --}}
-                <div class="col-md col-sm-12">
+                <div class="col-md col-sm-6">
                     <a href="{{ route('teacher.final_grades.edit', ['subject_id' => $subject->id, 'section_id' => $class->id]) }}" class="btn btn-outline-danger w-100 py-3 shadow-sm hover-scale text-decoration-none">
                         <i class="fas fa-graduation-cap fa-lg d-block mb-2"></i>
                         <span class="fw-bold">رصد النهائي</span>
+                    </a>
+                </div>
+
+                {{-- 6. زر المذكرات والملفات الدراسية --}}
+                <div class="col-md col-sm-6">
+                    <a href="{{ route('teacher.materials.index', ['subject_id' => $subject->id, 'section_id' => $class->id]) }}" class="btn btn-outline-dark w-100 py-3 shadow-sm hover-scale text-decoration-none">
+                        <i class="fas fa-folder-open fa-lg d-block mb-2"></i>
+                        <span class="fw-bold">المذكرات والملفات</span>
                     </a>
                 </div>
             </div>

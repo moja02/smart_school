@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use App\Models\User;
 use App\Models\StudentProfile;
+use App\Models\FeePayment;
+use App\Models\Homework;
+use App\Models\LeaveRequest;
+use App\Models\WalletTransaction;
 
 class ParentController extends Controller
 {
@@ -48,34 +52,37 @@ class ParentController extends Controller
 
                     foreach ($assessments as $assessment) {
                         // البحث عن درجة الابن في هذا التقييم بالتحديد
-                        $markRecord = \App\Models\AssessmentMark::where('student_id', $child->id)
+                        $markRecord = \App\Models\AssessmentMark::where('student_id', $child->user_id)
                                                     ->where('assessment_id', $assessment->id)
                                                     ->first();
                         
-                        $score = $markRecord ? ($markRecord->marks ?? $markRecord->score ?? $markRecord->mark ?? 0) : null;
-                        $assessmentMax = $assessment->max_score ?? $assessment->full_mark ?? 0;
+                        // تجميع المجموع إذا كانت الدرجة مرصودة فعلياً وليست فارغة
+                        if ($markRecord && $markRecord->score !== null) {
+                            $score = $markRecord->score ?? $markRecord->marks ?? $markRecord->mark ?? 0;
+                            $assessmentMax = $assessment->max_score ?? $assessment->full_mark ?? 0;
+                            
+                            $subjectTotal += $score;
+                            $subjectMaxTotal += $assessmentMax;
+                        }
                         
+                        $scoreValue = $markRecord ? ($markRecord->marks ?? $markRecord->score ?? $markRecord->mark ?? null) : null;
                         $detailedMarks[] = (object)[
                             'title'     => $assessment->title ?? $assessment->name ?? 'تقييم',
-                            'max_score' => $assessmentMax > 0 ? $assessmentMax : '--',
-                            'score'     => $score,
+                            'max_score' => ($assessment->max_score ?? $assessment->full_mark ?? 0) > 0 ? ($assessment->max_score ?? $assessment->full_mark ?? 0) : '--',
+                            'score'     => $scoreValue,
                             'notes'     => $markRecord ? ($markRecord->notes ?? $markRecord->remarks ?? '') : ''
                         ];
-                        
-                        // تجميع المجموع إذا كانت الدرجة مرصودة
-                        if ($score !== null) {
-                            $subjectTotal += $score;
-                        }
-                        // حساب المجموع الكلي للتقييمات لهذه المادة (التقييمات المنشأة فعلياً)
-                        $subjectMaxTotal += $assessmentMax;
                     }
 
-                    $subjectsData->push((object)[
-                        'subject_name'   => $subject->name,
-                        'total_score'    => $subjectTotal,
-                        'max_total'      => $subjectMaxTotal,
-                        'detailed_marks' => $detailedMarks
-                    ]);
+                    // لا تقم بإضافة المادة للقائمة إلا إذا كان لديها تقييمات مسجلة
+                    if (count($detailedMarks) > 0) {
+                        $subjectsData->push((object)[
+                            'subject_name'   => $subject->name,
+                            'total_score'    => $subjectTotal,
+                            'max_total'      => $subjectMaxTotal,
+                            'detailed_marks' => $detailedMarks
+                        ]);
+                    }
 
                     $totalStudentScore += $subjectTotal;
                     $totalMaxScore += $subjectMaxTotal;
@@ -84,15 +91,45 @@ class ParentController extends Controller
                 // حساب النسبة المئوية للابن
                 $percentage = $totalMaxScore > 0 ? round(($totalStudentScore / $totalMaxScore) * 100, 1) : 0;
 
-                $childrenDetails[$child->id] = (object)[
+                // 🌟 إضافة بيانات الحضور للرسم البياني 🌟
+                $attendanceStats = [
+                    'present' => \DB::table('attendances')->where('student_id', $child->user_id)->where('status', 'present')->count(),
+                    'absent'  => \DB::table('attendances')->where('student_id', $child->user_id)->where('status', 'absent')->count(),
+                    'late'    => \DB::table('attendances')->where('student_id', $child->user_id)->where('status', 'late')->count(),
+                ];
+
+                // 🌟 تجهيز بيانات الرسم الشبكي (الرادار) للأداء الأكاديمي 🌟
+                $radarLabels = [];
+                $radarData = [];
+                foreach ($subjectsData as $sd) {
+                    if ($sd->max_total > 0) {
+                        $radarLabels[] = $sd->subject_name;
+                        $radarData[] = round(($sd->total_score / $sd->max_total) * 100);
+                    }
+                }
+
+                $childrenDetails[$child->user_id] = (object)[
                     'subjects'    => $subjectsData,
                     'percentage'  => $percentage,
                     'total_score' => $totalStudentScore,
-                    'max_score'   => $totalMaxScore
+                    'max_score'   => $totalMaxScore,
+                    'wallet'      => $child->wallet_balance ?? 0,
+                    'attendance'  => $attendanceStats,
+                    'chartLabels' => json_encode($radarLabels),
+                    'chartData'   => json_encode($radarData)
                 ];
 
             } else {
-                $childrenDetails[$child->id] = (object)['subjects' => collect(), 'percentage' => 0, 'total_score' => 0, 'max_score' => 0];
+                $childrenDetails[$child->user_id] = (object)[
+                    'subjects' => collect(), 
+                    'percentage' => 0, 
+                    'total_score' => 0, 
+                    'max_score' => 0,
+                    'wallet' => 0,
+                    'attendance' => ['present' => 0, 'absent' => 0, 'late' => 0],
+                    'chartLabels' => '[]',
+                    'chartData' => '[]'
+                ];
             }
         }
 
@@ -207,5 +244,496 @@ class ParentController extends Controller
         }
 
         return view('parent.exams', compact('calendarDays'));
+    }
+
+    // 1. الرسوم والدفعات
+    public function fees()
+    {
+        $parentId = Auth::id();
+        $children = StudentProfile::whereIn('user_id', function($q) use ($parentId) {
+                        $q->select('student_id')->from('parent_student')->where('parent_id', $parentId);
+                    })->with('feePayments')->get();
+
+        return view('parent.fees', compact('children'));
+    }
+
+    // 2. الواجبات المدرسية
+    public function homeworks()
+    {
+        $parentId = Auth::id();
+        $children = StudentProfile::whereIn('user_id', function($q) use ($parentId) {
+                        $q->select('student_id')->from('parent_student')->where('parent_id', $parentId);
+                    })->get();
+
+        $classIds = $children->pluck('class_id')->filter()->unique();
+
+        $homeworks = Homework::whereIn('class_id', $classIds)
+            ->with(['subject', 'teacher', 'schoolClass'])
+            ->orderBy('due_date', 'asc')
+            ->get();
+
+        return view('parent.homeworks', compact('children', 'homeworks'));
+    }
+
+    // 3. طلبات الاستئذان
+    public function leaves()
+    {
+        $parentId = Auth::id();
+        $leaves = LeaveRequest::where('parent_id', $parentId)->with('student.user')->orderBy('created_at', 'desc')->get();
+        $children = StudentProfile::whereIn('user_id', function($q) use ($parentId) {
+                        $q->select('student_id')->from('parent_student')->where('parent_id', $parentId);
+                    })->with('user')->get();
+
+        return view('parent.leaves', compact('leaves', 'children'));
+    }
+
+    public function storeLeave(Request $request)
+    {
+        $request->validate([
+            'student_id' => 'required|exists:student_profiles,id',
+            'type' => 'required|in:absence,early_leave',
+            'leave_date' => 'required|date',
+            'reason' => 'required|string|max:500',
+        ]);
+
+        LeaveRequest::create([
+            'parent_id' => Auth::id(),
+            'student_id' => $request->student_id,
+            'type' => $request->type,
+            'leave_date' => $request->leave_date,
+            'reason' => $request->reason,
+            'status' => 'pending'
+        ]);
+
+        return back()->with('success', 'تم إرسال طلب الاستئذان للإدارة بنجاح.');
+    }
+
+    public function updateWalletPin(Request $request)
+    {
+        $request->validate([
+            'student_id' => 'required|exists:student_profiles,id',
+            'wallet_pin' => 'nullable|digits:4'
+        ]);
+
+        $parentId = Auth::id();
+        
+        // Verify child belongs to parent
+        $isChild = \DB::table('parent_student')
+            ->join('student_profiles', 'parent_student.student_id', '=', 'student_profiles.user_id')
+            ->where('parent_student.parent_id', $parentId)
+            ->where('student_profiles.id', $request->student_id)
+            ->exists();
+            
+        if (!$isChild) {
+            abort(403, 'غير مصرح لك بتعديل بيانات هذا الطالب.');
+        }
+
+        $profile = StudentProfile::findOrFail($request->student_id);
+        $profile->wallet_pin = $request->wallet_pin;
+        $profile->save();
+
+        return back()->with('success', 'تم تحديث الرقم السري للمحفظة بنجاح.');
+    }
+
+    // 6. المحفظة الرقمية
+    public function wallet()
+    {
+        $parentId = Auth::id();
+        $children = StudentProfile::whereIn('user_id', function($q) use ($parentId) {
+                        $q->select('student_id')->from('parent_student')->where('parent_id', $parentId);
+                    })->with('user')->get();
+
+        $transactions = [];
+        foreach($children as $child) {
+            $transactions[$child->id] = WalletTransaction::where('student_id', $child->id)
+                                        ->orderBy('created_at', 'desc')
+                                        ->get();
+        }
+
+        return view('parent.wallet', compact('children', 'transactions'));
+    }
+
+    public function transferWallet(Request $request)
+    {
+        $request->validate([
+            'from_student_id' => 'required|exists:student_profiles,id',
+            'to_student_id' => 'required|exists:student_profiles,id|different:from_student_id',
+            'amount' => 'required|numeric|min:1'
+        ]);
+
+        $parentId = Auth::id();
+
+        // التأكد من أن كلا الطالبين يتبعان لولي الأمر
+        $validChildrenCount = \DB::table('parent_student')
+            ->join('student_profiles', 'parent_student.student_id', '=', 'student_profiles.user_id')
+            ->where('parent_student.parent_id', $parentId)
+            ->whereIn('student_profiles.id', [$request->from_student_id, $request->to_student_id])
+            ->count();
+
+        if ($validChildrenCount !== 2) {
+            return back()->with('error', 'غير مصرح لك بالتحويل. الأبناء غير مرتبطين بحسابك.');
+        }
+
+        $fromProfile = StudentProfile::findOrFail($request->from_student_id);
+        $toProfile = StudentProfile::findOrFail($request->to_student_id);
+
+        if (($fromProfile->wallet_balance ?? 0) < $request->amount) {
+            return back()->with('error', 'الرصيد في محفظة المرسل غير كافٍ.');
+        }
+
+        \DB::transaction(function() use ($fromProfile, $toProfile, $request) {
+            // سحب من المرسل
+            $fromProfile->wallet_balance -= $request->amount;
+            $fromProfile->save();
+            WalletTransaction::create([
+                'student_id' => $fromProfile->id,
+                'amount' => $request->amount,
+                'type' => 'withdrawal',
+                'description' => 'تحويل رصيد إلى ' . ($toProfile->user->name ?? 'أخ')
+            ]);
+
+            // إيداع للمستلم
+            $toProfile->wallet_balance += $request->amount;
+            $toProfile->save();
+            WalletTransaction::create([
+                'student_id' => $toProfile->id,
+                'amount' => $request->amount,
+                'type' => 'deposit',
+                'description' => 'استلام رصيد محول من ' . ($fromProfile->user->name ?? 'أخ')
+            ]);
+        });
+
+        return back()->with('success', 'تم تحويل الرصيد بنجاح!');
+    }
+
+    public function setDailyLimit(Request $request)
+    {
+        $request->validate([
+            'student_id' => 'required|exists:student_profiles,id',
+            'daily_limit' => 'nullable|numeric|min:0'
+        ]);
+
+        $parentId = Auth::id();
+        $isChild = \DB::table('parent_student')
+            ->join('student_profiles', 'parent_student.student_id', '=', 'student_profiles.user_id')
+            ->where('parent_student.parent_id', $parentId)
+            ->where('student_profiles.id', $request->student_id)
+            ->exists();
+
+        if (!$isChild) {
+            return back()->with('error', 'غير مصرح لك بتعديل بيانات هذا الطالب.');
+        }
+
+        $profile = StudentProfile::findOrFail($request->student_id);
+        $profile->daily_limit = $request->daily_limit > 0 ? $request->daily_limit : null;
+        $profile->save();
+
+        return back()->with('success', 'تم ضبط سقف المصروفات اليومي بنجاح.');
+    }
+    // عرض أبناء ولي الأمر
+    public function children()
+    {
+        $parentId = Auth::id();
+        $children = StudentProfile::whereIn('user_id', function($q) use ($parentId) {
+            $q->select('student_id')->from('parent_student')->where('parent_id', $parentId);
+        })->with('user', 'schoolClass')->get();
+
+        return view('parent.children', compact('children'));
+    }
+
+    // عرض درجات الأبناء
+    public function grades()
+    {
+        $parentId = Auth::id();
+        $children = StudentProfile::whereIn('user_id', function($q) use ($parentId) {
+            $q->select('student_id')->from('parent_student')->where('parent_id', $parentId);
+        })->with('user')->get();
+
+        // تمرير المتغيرات المطلوبة في blade
+        foreach ($children as $child) {
+            $child->name = $child->user->name ?? 'غير معروف';
+            $child->class_name = $child->schoolClass->name ?? 'غير محدد';
+        }
+
+        return view('parent.grades', compact('children'));
+    }
+
+    // عرض سلوك الأبناء
+    public function behaviour()
+    {
+        $parentId = Auth::id();
+        $children = StudentProfile::whereIn('user_id', function($q) use ($parentId) {
+            $q->select('student_id')->from('parent_student')->where('parent_id', $parentId);
+        })->with('user')->get();
+
+        return view('parent.behaviour', compact('children'));
+    }
+
+    // عرض وإرسال رسائل
+    public function messages(Request $request)
+    {
+        // إذا كان طلب POST، قم بحفظ الرسالة أو معالجتها
+        if ($request->isMethod('post')) {
+            // إضافة معالجة بسيطة في حالة الإرسال لتجنب الأخطاء
+            $request->validate([
+                'subject' => 'required|string|max:255',
+                'body' => 'required|string|max:1000'
+            ]);
+
+            \App\Models\Message::create([
+                'sender_id' => Auth::id(),
+                'subject' => $request->subject,
+                'body' => $request->body,
+                'type' => 'parent_to_school'
+            ]);
+
+            return back()->with('success', 'تم إرسال الرسالة للإدارة بنجاح.');
+        }
+
+        // جلب الرسائل المستلمة لولي الأمر
+        $messages = \App\Models\Message::where('receiver_id', Auth::id())
+            ->orWhere(function($query) {
+                $query->where('type', 'broadcast')->where('target_role', 'parent');
+            })
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return view('parent.messages', compact('messages'));
+    }
+
+    // ==========================================
+    // Advanced Parent Reports
+    // ==========================================
+    public function comprehensiveReportCard($studentId)
+    {
+        $parentId = Auth::id();
+        // Verify this student belongs to this parent
+        $isChild = \DB::table('parent_student')
+            ->where('parent_id', $parentId)
+            ->where('student_id', $studentId)
+            ->exists();
+            
+        if (!$isChild) abort(403);
+
+        $student = User::with('studentProfile.schoolClass.grade')->findOrFail($studentId);
+        $classId = $student->studentProfile->class_id; 
+        $school = \DB::table('schools')->find($student->school_id);
+
+        $subjects = \DB::table('teacher_subject_section')
+            ->join('subjects', 'teacher_subject_section.subject_id', '=', 'subjects.id')
+            ->where('teacher_subject_section.section_id', $classId)
+            ->select('subjects.id', 'subjects.name')
+            ->distinct() 
+            ->get();
+
+        $marks = [];
+        $totalSum = 0;
+        $maxPossibleSum = 0; 
+
+        foreach ($subjects as $subject) {
+            $assessments = \App\Models\Assessment::where('subject_id', $subject->id)->get();
+            $works1 = 0;
+            $final1 = 0;
+            $works2 = 0;
+            $final2 = 0;
+            $total = 0;
+            $maxSubjectScore = 0;
+
+            foreach ($assessments as $assessment) {
+                $markRecord = \App\Models\AssessmentMark::where('student_id', $studentId)
+                                            ->where('assessment_id', $assessment->id)
+                                            ->first();
+                
+                // حساب الدرجات المرصودة فعلياً فقط (لا نحتسب الاختبارات التي لم يؤدها أو لم ترصد بعد)
+                if ($markRecord && $markRecord->score !== null) {
+                    $score = $markRecord->score ?? $markRecord->marks ?? $markRecord->mark ?? 0;
+                    $max = $assessment->max_score ?? $assessment->full_mark ?? 100;
+                    
+                    $total += $score;
+                    $maxSubjectScore += $max;
+
+                    // تصنيف الدرجات بناءً على الفصل الدراسي ونوع التقييم (إن وجد)
+                    $semester = $assessment->semester ?? 1;
+                    $type = $assessment->type ?? 'works'; // works أو final
+
+                    if ($semester == 1) {
+                        if ($type == 'final') $final1 += $score;
+                        else $works1 += $score;
+                    } else {
+                        if ($type == 'final') $final2 += $score;
+                        else $works2 += $score;
+                    }
+                }
+            }
+
+            // إذا لم يكن هناك تقييمات، نترك المادة فارغة
+            if ($maxSubjectScore == 0) {
+                $marks[] = [
+                    'subject_name' => $subject->name,
+                    'works_sem1' => '-',
+                    'final_sem1' => '-',
+                    'works_sem2' => '-',
+                    'final_sem2' => '-',
+                    'total' => '-',
+                    'grade_letter' => '-'
+                ];
+            } else {
+                // تحويل الدرجة لنسبة من 100 لتناسب الشهادة
+                $normalizedTotal = round(($total / $maxSubjectScore) * 100);
+                
+                $marks[] = [
+                    'subject_name' => $subject->name,
+                    'works_sem1' => $works1,
+                    'final_sem1' => $final1,
+                    'works_sem2' => $works2,
+                    'final_sem2' => $final2,
+                    'total' => $normalizedTotal,
+                    'grade_letter' => $this->getGradeLetter($normalizedTotal)
+                ];
+
+                $totalSum += $normalizedTotal;
+                $maxPossibleSum += 100;
+            }
+        }
+
+        $percentage = $maxPossibleSum > 0 ? round(($totalSum / $maxPossibleSum) * 100, 2) : 0;
+        $overallGrade = $this->getGradeLetter($percentage, true);
+
+        return view('parent.reports.certificate', compact('student', 'school', 'marks', 'totalSum', 'maxPossibleSum', 'percentage', 'overallGrade'));
+    }
+
+    private function getGradeLetter($score, $isPercentage = false)
+    {
+        // Assume score is out of 100 for simplicity
+        if ($score >= 85) return 'ممتاز';
+        if ($score >= 75) return 'جيد جداً';
+        if ($score >= 65) return 'جيد';
+        if ($score >= 50) return 'مقبول';
+        return 'ضعيف';
+    }
+
+    public function academicProgress($studentId)
+    {
+        $parentId = Auth::id();
+        // Verify this student belongs to this parent
+        $isChild = \DB::table('parent_student')
+            ->where('parent_id', $parentId)
+            ->where('student_id', $studentId)
+            ->exists();
+            
+        if (!$isChild) abort(403);
+
+        $student = User::with('studentProfile.schoolClass')->findOrFail($studentId);
+        
+        $class_id = $student->studentProfile->class_id ?? $student->studentProfile->section_id ?? null;
+        $class = $class_id ? \App\Models\SchoolClass::find($class_id) : null;
+        $subjects = \App\Models\Subject::where('grade_id', $class->grade_id ?? null)->get();
+
+        $scores = collect();
+        $weakLessons = collect();
+        $averageLessons = collect();
+        $strongLessons = collect();
+
+        foreach ($subjects as $subject) {
+            $assessments = \App\Models\Assessment::where('subject_id', $subject->id)->get();
+            $subjectTotal = 0;
+            $subjectMax = 0;
+            
+            foreach ($assessments as $assessment) {
+                $markRecord = \App\Models\AssessmentMark::where('student_id', $studentId)
+                                            ->where('assessment_id', $assessment->id)
+                                            ->first();
+                                            
+                if ($markRecord && $markRecord->score !== null) {
+                    $score = $markRecord->score ?? $markRecord->marks ?? $markRecord->mark ?? 0;
+                    $max = $assessment->max_score ?? $assessment->full_mark ?? 0;
+                    
+                    $subjectTotal += $score;
+                    $subjectMax += $max;
+
+                    // تصنيف مستوى الطالب في كل تقييم
+                    if ($max > 0) {
+                        $assessmentPercentage = round(($score / $max) * 100, 1);
+                        $lessonObj = (object)[
+                            'lesson_name' => $assessment->title ?? $assessment->name ?? 'تقييم: ' . $assessment->id,
+                            'subject_name' => $subject->name,
+                            'score' => $score,
+                            'total' => $max,
+                            'percentage' => $assessmentPercentage
+                        ];
+
+                        if ($assessmentPercentage < 50) {
+                            $weakLessons->push($lessonObj);
+                        } elseif ($assessmentPercentage >= 80) {
+                            $strongLessons->push($lessonObj);
+                        } else {
+                            $averageLessons->push($lessonObj);
+                        }
+                    }
+                }
+            }
+
+            // تحويل إلى نسبة 100% ليظهر في المنحنى بشكل متناسق
+            if ($subjectMax > 0) {
+                $percentage = round(($subjectTotal / $subjectMax) * 100, 1);
+                $scores->push((object)[
+                    'subject_name' => $subject->name,
+                    'total_score' => $percentage
+                ]);
+            }
+        }
+
+        // جلب نتائج الاختبارات التجريبية للدروس
+        $quizAttempts = \DB::table('quiz_attempts')
+            ->join('lessons', 'quiz_attempts.lesson_id', '=', 'lessons.id')
+            ->join('subjects', 'lessons.subject_id', '=', 'subjects.id')
+            ->join('student_profiles', 'quiz_attempts.student_id', '=', 'student_profiles.id')
+            ->where('student_profiles.user_id', $studentId)
+            ->where('quiz_attempts.total', '>', 0)
+            ->select(
+                'lessons.title as lesson_name', 
+                'subjects.name as subject_name', 
+                'quiz_attempts.score', 
+                'quiz_attempts.total'
+            )
+            ->get()
+            ->map(function($item) {
+                $item->percentage = round(($item->score / $item->total) * 100, 1);
+                return $item;
+            });
+
+        // تصنيف دروس الاختبارات التجريبية
+        foreach ($quizAttempts as $attempt) {
+            if ($attempt->percentage < 50) {
+                $weakLessons->push($attempt);
+            } elseif ($attempt->percentage >= 80) {
+                $strongLessons->push($attempt);
+            } else {
+                $averageLessons->push($attempt);
+            }
+        }
+
+        return view('parent.reports.progress', compact('student', 'scores', 'weakLessons', 'averageLessons', 'strongLessons'));
+    }
+
+    public function disciplineSummary($studentId)
+    {
+        $parentId = Auth::id();
+        // Verify this student belongs to this parent
+        $isChild = \DB::table('parent_student')
+            ->where('parent_id', $parentId)
+            ->where('student_id', $studentId)
+            ->exists();
+            
+        if (!$isChild) abort(403);
+
+        $student = User::findOrFail($studentId);
+        
+        $presentCount = \DB::table('attendances')->where('student_id', $studentId)->where('status', 'حاضر')->count();
+        $absentCount = \DB::table('attendances')->where('student_id', $studentId)->where('status', 'غائب')->count();
+        
+        $leaves = \DB::table('leaves')->where('student_id', $studentId)->get();
+
+        return view('parent.reports.discipline', compact('student', 'presentCount', 'absentCount', 'leaves'));
     }
 }

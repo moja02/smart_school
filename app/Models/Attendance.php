@@ -9,13 +9,13 @@ use Spatie\Activitylog\LogOptions;
 class Attendance extends Model
 {
     //protected $fillable = ['student_id', 'class_id', 'attendance_date', 'status'];
-    protected $fillable = ['user_id', 'date', 'status'];
+    protected $fillable = ['user_id', 'student_id', 'class_id', 'attendance_date', 'status'];
     use LogsActivity;
 
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['user_id', 'date', 'status'])
+            ->logOnly(['user_id', 'student_id', 'class_id', 'attendance_date', 'status'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('سجل الغياب والحضور');

@@ -6,8 +6,11 @@
         <p class="text-muted mb-0">{{ $subject->name }} - {{ $class->name }}</p>
     </div>
     <div class="card-body">
-        <form action="{{ route('teacher.assessments.store_grades', ['subject_id' => $subject->id, 'class_id' => $class->id, 'assessment_id' => $assessment->id]) }}" method="POST">
+        <form action="{{ route('teacher.assessments.save_marks') }}" method="POST">
             @csrf
+            <input type="hidden" name="subject_id" value="{{ $subject->id }}">
+            <input type="hidden" name="class_id" value="{{ $class->id }}">
+            <input type="hidden" name="assessment_id" value="{{ $assessment->id }}">
             <table class="table table-bordered">
                 <thead><tr><th>الطالب</th><th>الدرجة (من {{ $assessment->max_score }})</th></tr></thead>
                 <tbody>

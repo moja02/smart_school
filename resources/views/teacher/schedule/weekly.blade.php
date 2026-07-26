@@ -48,9 +48,12 @@
                                         @if($schedule)
                                             <div class="p-2 bg-primary bg-opacity-10 rounded shadow-sm border border-primary border-opacity-25">
                                                 <div class="fw-bold text-primary mb-1">{{ $schedule->subject->name ?? 'مادة' }}</div>
-                                                <span class="badge bg-dark rounded-pill shadow-sm">
+                                                <span class="badge bg-dark rounded-pill shadow-sm mb-1 d-block">
                                                     <i class="fas fa-users me-1"></i> {{ $schedule->schoolClass->name ?? $schedule->schoolClass->section ?? 'فصل' }}
                                                 </span>
+                                                <a href="{{ route('teacher.homeworks.index', ['subject_id' => $schedule->subject_id, 'section_id' => $schedule->class_id]) }}" class="btn btn-sm btn-outline-primary py-0 px-2 mt-1" style="font-size: 0.75rem;" title="إدارة الواجبات">
+                                                    <i class="fas fa-book"></i> الواجبات
+                                                </a>
                                             </div>
                                         @else
                                             <span class="text-black-50 opacity-25">-</span>

@@ -11,6 +11,8 @@ return new class extends Migration
         Schema::create('schools', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->string('academic_year')->nullable();
+            $table->boolean('grading_locked')->default(false);
             $table->timestamps();
         });
     }

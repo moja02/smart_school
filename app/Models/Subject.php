@@ -14,7 +14,6 @@ class Subject extends Model
     protected $guarded = [];
     protected $fillable = [
     'name', 
-    'weekly_classes', // ✅ تأكد من وجود هذا
     'grade_id', 
     'school_id',
     'works_score', // ✅ درجة الأعمال
@@ -25,7 +24,7 @@ class Subject extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name', 'weekly_classes', 'works_score', 'final_score', 'total_score'])
+            ->logOnly(['name', 'works_score', 'final_score', 'total_score'])
             ->logOnlyDirty()
             ->useLogName('إعدادات المواد والدرجات');
     }
@@ -72,8 +71,8 @@ class Subject extends Model
             return $setting->weekly_classes;
         }
 
-        // لو مفيش، نرجعوا عدد الحصص من جدول المواد الأساسي، أو 1 كقيمة احتياطية
-        return $this->weekly_classes ?? 1;
+        // لو مفيش، نرجع 1 كقيمة احتياطية
+        return 1;
     }
 
     public function school()

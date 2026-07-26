@@ -28,9 +28,11 @@ class AuthController extends Controller
             'role'     => 'required|in:student,teacher,parent',
         ]);
 
+        $data['is_banned'] = 1; // الحساب يكون محظوراً/غير مفعل افتراضياً
+
         User::create($data);
 
-        return to_route('login.form')->with('success', 'تم إنشاء الحساب بنجاح، تفضل بتسجيل الدخول.');
+        return to_route('login.form')->with('success', 'تم إنشاء الحساب بنجاح، يرجى انتظار تفعيل الحساب من قبل الإدارة لتتمكن من الدخول.');
     }
 
     public function login(Request $request)
@@ -47,7 +49,7 @@ class AuthController extends Controller
                 Auth::logout(); // تسجيل خروج فوري
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
-                return back()->withErrors(['email' => 'عذراً، هذا الحساب محظور من قبل الإدارة. يرجى مراجعة المدرسة.']);
+                return back()->withErrors(['email' => 'عذراً، هذا الحساب محظور أو بانتظار تفعيل الإدارة. يرجى مراجعة المدرسة.']);
             }
             // 👆 نهاية كود الحظر 👆
 

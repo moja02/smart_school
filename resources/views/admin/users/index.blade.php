@@ -15,58 +15,44 @@
 {{-- ========================================== --}}
 {{-- ✅ نموذج الفلترة والبحث --}}
 {{-- ========================================== --}}
-<div class="card shadow border-0 mb-4">
-    <div class="card-header bg-white py-3">
-        <h6 class="m-0 fw-bold text-primary"><i class="fas fa-filter me-2"></i> بحث وتصفية</h6>
-    </div>
-    <div class="card-body">
-        <form action="{{ route('admin.users') }}" method="GET">
-            <div class="row g-3 align-items-end">
-                
-                {{-- 1. البحث بالاسم أو الإيميل --}}
-                <div class="col-md-4">
-                    <label class="form-label small text-muted fw-bold">بحث عام</label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
-                        <input type="text" name="search" class="form-control border-start-0 ps-0" 
-                               value="{{ request('search') }}" 
-                               placeholder="اسم المستخدم أو البريد...">
+<div class="card shadow-sm border-0 mb-4" style="border-radius: 15px;">
+    <div class="card-body p-4">
+        <form action="{{ route('admin.users') }}" method="GET" id="searchForm">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <div class="form-floating">
+                        <input type="text" name="search" class="form-control" id="searchUser" placeholder="الاسم أو البريد..." value="{{ request('search') }}" style="border-radius: 10px;">
+                        <label for="searchUser"><i class="fas fa-search text-muted me-1"></i> ابحث عن مستخدم...</label>
                     </div>
                 </div>
 
-                {{-- 2. الفلترة حسب الصلاحية --}}
                 <div class="col-md-3">
-                    <label class="form-label small text-muted fw-bold">نوع المستخدم</label>
-                    <select name="role" class="form-select">
-                        <option value="">-- الكل --</option>
-                        <option value="teacher" {{ request('role') == 'teacher' ? 'selected' : '' }}>معلم</option>
-                        <option value="student" {{ request('role') == 'student' ? 'selected' : '' }}>طالب</option>
-                        <option value="parent" {{ request('role') == 'parent' ? 'selected' : '' }}>ولي أمر</option>
-                    </select>
-                </div>
-
-                {{-- 3. أزرار التحكم --}}
-                <div class="col-md-3">
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary w-100 shadow-sm">
-                            <i class="fas fa-filter me-1"></i> تصفية
-                        </button>
-                        
-                        @if(request()->has('search') || request()->has('role'))
-                            <a href="{{ route('admin.users') }}" class="btn btn-outline-secondary shadow-sm" title="إلغاء الفلاتر">
-                                <i class="fas fa-times"></i>
-                            </a>
-                        @endif
+                    <div class="form-floating">
+                        <select name="role" class="form-select select2-ui" id="roleSelect" style="border-radius: 10px;">
+                            <option value="">جميع الصلاحيات</option>
+                            <option value="teacher" {{ request('role') == 'teacher' ? 'selected' : '' }}>معلم</option>
+                            <option value="student" {{ request('role') == 'student' ? 'selected' : '' }}>طالب</option>
+                            <option value="parent" {{ request('role') == 'parent' ? 'selected' : '' }}>ولي أمر</option>
+                        </select>
+                        <label for="roleSelect"><i class="fas fa-user-shield text-muted me-1"></i> نوع المستخدم</label>
                     </div>
                 </div>
 
-                {{-- زر إضافة مستخدم جديد --}}
-                <div class="col-md-2 text-end">
-                    <a href="{{ route('admin.users.create') }}" class="btn btn-success w-100 shadow-sm">
-                        <i class="fas fa-plus me-1"></i> جديد
+                <div class="col-md-4 d-flex align-items-center gap-2">
+                    <button type="submit" class="btn btn-primary h-100 flex-grow-1 shadow-sm" style="border-radius: 10px;">
+                        <i class="fas fa-filter me-1"></i> عرض النتائج
+                    </button>
+                    
+                    @if(request()->has('search') || request()->has('role'))
+                        <a href="{{ route('admin.users') }}" class="btn btn-light h-100 shadow-sm border" title="مسح الفلاتر" style="border-radius: 10px;">
+                            <i class="fas fa-undo text-danger"></i>
+                        </a>
+                    @endif
+
+                    <a href="{{ route('admin.users.create') }}" class="btn btn-success h-100 shadow-sm" style="border-radius: 10px;">
+                        <i class="fas fa-plus me-1"></i> إضافة
                     </a>
                 </div>
-
             </div>
         </form>
     </div>
@@ -75,7 +61,7 @@
 {{-- ========================================== --}}
 {{-- جدول العرض --}}
 {{-- ========================================== --}}
-<div class="card shadow border-0">
+<div class="card shadow border-0" id="usersTableContainer">
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
@@ -201,90 +187,149 @@
     document.addEventListener('DOMContentLoaded', function () {
         
         // ============================================
-        // 1. كود تصفير كلمة المرور (أصفر)
         // ============================================
-        const resetButtons = document.querySelectorAll('.btn-reset');
-        resetButtons.forEach(button => {
-            button.addEventListener('click', function (e) {
-                e.preventDefault();
-                const form = this.closest('.form-reset');
-                
-                Swal.fire({
-                    title: 'تصفير كلمة المرور؟',
-                    text: "سيعود الباسورد إلى: 12345678",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#ffc107',
-                    cancelButtonColor: '#6c757d',
-                    confirmButtonText: 'نعم، صفرها',
-                    cancelButtonText: 'تراجع',
-                    color: '#000'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        form.submit();
-                    }
+        // 🛡️ تفعيل رسائل التنبيه (SweetAlert)
+        // ============================================
+        function bindSweetAlerts() {
+            // 1. كود تصفير كلمة المرور (أصفر)
+            const resetButtons = document.querySelectorAll('.btn-reset');
+            resetButtons.forEach(button => {
+                const newButton = button.cloneNode(true);
+                button.parentNode.replaceChild(newButton, button);
+                newButton.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const form = this.closest('.form-reset');
+                    Swal.fire({
+                        title: 'تصفير كلمة المرور؟',
+                        text: "سيعود الباسورد إلى: 12345678",
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#ffc107',
+                        cancelButtonColor: '#6c757d',
+                        confirmButtonText: 'نعم، صفرها',
+                        cancelButtonText: 'تراجع',
+                        color: '#000'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            form.submit();
+                        }
+                    });
                 });
             });
-        });
 
-        // ============================================
-        // 2. كود الحظر وإلغاء الحظر (أسود/أخضر - جديد)
-        // ============================================
-        const banButtons = document.querySelectorAll('.btn-ban');
-        banButtons.forEach(button => {
-            button.addEventListener('click', function (e) {
-                e.preventDefault();
-                const form = this.closest('.form-ban');
-                const action = this.getAttribute('data-action');
-                
-                const titleText = action === 'ban' ? 'حظر المستخدم؟' : 'إلغاء حظر المستخدم؟';
-                const descText = action === 'ban' ? 'لن يتمكن هذا المستخدم من الدخول إلى حسابه في النظام.' : 'سيتم تفعيل حساب هذا المستخدم ليتمكن من الدخول مجدداً.';
-                const confirmColor = action === 'ban' ? '#212529' : '#198754';
-                const confirmBtnText = action === 'ban' ? 'نعم، قم بالحظر' : 'نعم، ألغِ الحظر';
+            // 2. كود الحظر وإلغاء الحظر (أسود/أخضر - جديد)
+            const banButtons = document.querySelectorAll('.btn-ban');
+            banButtons.forEach(button => {
+                const newButton = button.cloneNode(true);
+                button.parentNode.replaceChild(newButton, button);
+                newButton.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const form = this.closest('.form-ban');
+                    const action = this.getAttribute('data-action');
+                    
+                    const titleText = action === 'ban' ? 'حظر المستخدم؟' : 'إلغاء حظر المستخدم؟';
+                    const descText = action === 'ban' ? 'لن يتمكن هذا المستخدم من الدخول إلى حسابه في النظام.' : 'سيتم تفعيل حساب هذا المستخدم ليتمكن من الدخول مجدداً.';
+                    const confirmColor = action === 'ban' ? '#212529' : '#198754';
+                    const confirmBtnText = action === 'ban' ? 'نعم، قم بالحظر' : 'نعم، ألغِ الحظر';
 
-                Swal.fire({
-                    title: titleText,
-                    text: descText,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: confirmColor,
-                    cancelButtonColor: '#6c757d',
-                    confirmButtonText: confirmBtnText,
-                    cancelButtonText: 'تراجع'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        form.submit();
-                    }
+                    Swal.fire({
+                        title: titleText,
+                        text: descText,
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: confirmColor,
+                        cancelButtonColor: '#6c757d',
+                        confirmButtonText: confirmBtnText,
+                        cancelButtonText: 'تراجع'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            form.submit();
+                        }
+                    });
                 });
             });
-        });
-
-        // ============================================
-        // 3. كود الحذف النهائي (أحمر)
-        // ============================================
-        const deleteButtons = document.querySelectorAll('.btn-delete');
-        deleteButtons.forEach(button => {
-            button.addEventListener('click', function (e) {
-                e.preventDefault();
-                const form = this.closest('.form-delete');
+            const deleteButtons = document.querySelectorAll('.btn-delete');
+            deleteButtons.forEach(button => {
+                // Remove old event listeners to prevent duplicates if bound multiple times
+                const newButton = button.cloneNode(true);
+                button.parentNode.replaceChild(newButton, button);
                 
-                Swal.fire({
-                    title: 'هل أنت متأكد؟',
-                    text: "لا يمكن التراجع عن هذا الإجراء! سيتم حذف المستخدم وجميع بياناته.",
-                    icon: 'error',
-                    showCancelButton: true,
-                    confirmButtonColor: '#d33',
-                    cancelButtonColor: '#3085d6',
-                    confirmButtonText: 'نعم، احذفه!',
-                    cancelButtonText: 'تراجع'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        form.submit();
-                    }
+                newButton.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const form = this.closest('.form-delete');
+                    
+                    Swal.fire({
+                        title: 'هل أنت متأكد؟',
+                        text: "لا يمكن التراجع عن هذا الإجراء! سيتم حذف المستخدم وجميع بياناته.",
+                        icon: 'error',
+                        showCancelButton: true,
+                        confirmButtonColor: '#d33',
+                        cancelButtonColor: '#3085d6',
+                        confirmButtonText: 'نعم، احذفه!',
+                        cancelButtonText: 'تراجع'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            form.submit();
+                        }
+                    });
                 });
             });
+        }
+        
+        // Initial bind
+        bindSweetAlerts();
+
+        // ============================================
+        // 🚀 البحث الحي (Live Search AJAX)
+        // ============================================
+        let searchTimeout = null;
+        const searchForm = document.getElementById('searchForm');
+        const searchInput = document.getElementById('searchUser');
+        const roleSelect = document.getElementById('roleSelect');
+        const tableContainer = document.getElementById('usersTableContainer');
+
+        function fetchResults() {
+            tableContainer.style.opacity = '0.5'; // تأثير بصري للتحميل
+            
+            const url = new URL(searchForm.action);
+            if (searchInput.value.trim() !== '') {
+                url.searchParams.set('search', searchInput.value);
+            }
+            if (roleSelect.value !== '') {
+                url.searchParams.set('role', roleSelect.value);
+            }
+
+            // تحديث رابط الصفحة في المتصفح للحفاظ على الفلاتر عند التحديث
+            window.history.pushState({}, '', url);
+
+            fetch(url, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.text())
+            .then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newTable = doc.getElementById('usersTableContainer');
+                if (newTable) {
+                    tableContainer.innerHTML = newTable.innerHTML;
+                    tableContainer.style.opacity = '1';
+                    bindSweetAlerts(); // إعادة تفعيل الأزرار بعد تحديث الجدول
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching data:', err);
+                tableContainer.style.opacity = '1';
+            });
+        }
+
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(fetchResults, 400); // الانتظار 400 ملي ثانية بعد آخر ضغطة
         });
 
+        roleSelect.addEventListener('change', fetchResults);
     });
 </script>
 @endsection

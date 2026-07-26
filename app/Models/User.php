@@ -24,12 +24,14 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'photo',
         'password',
         'role',
         'school_id',
         'phone',       
         'address',     
         'birth_date',
+        'is_banned',
     ];
 
     protected $hidden = [
@@ -127,29 +129,29 @@ class User extends Authenticatable
         return $this->hasOne(StudentProfile::class, 'user_id');
     }
 
-    public function school_class()
+    public function user()
     {
-        // علاقة "عبر وسيط": نصل للفصل من خلال البروفايل
-        return $this->hasOneThrough(
-            SchoolClass::class,      // الهدف: الفصل
-            StudentProfile::class,   // الوسيط: البروفايل
-            'user_id',               // المفتاح في البروفايل الذي يربطه باليوزر
-            'id',                    // المفتاح في الفصل
-            'id',                    // المفتاح في اليوزر
-            'class_id'               // المفتاح في البروفايل الذي يربطه بالفصل
-        );
+        // علاقة مرجعية ذاتية لدعم الاستخدام المباشر لليوزر كبروفايل
+        return $this->belongsTo(self::class, 'id', 'id');
     }
-    // داخل كلاس User
+
     public function schoolClass()
     {
-        // الطالب ينتمي إلى شعبة واحدة (التي جدولها هو classes)
-        return $this->belongsTo(SchoolClass::class, 'class_id'); 
+        // الطالب ينتمي إلى شعبة واحدة عبر البروفايل
+        return $this->hasOneThrough(
+            SchoolClass::class,
+            StudentProfile::class,
+            'user_id',
+            'id',
+            'id',
+            'class_id'
+        );
     }
 
     
     public function schedules()
     {
-        return $this->hasMany(Schedule::class, 'teacher_id');
+        return $this->hasMany(Schedule::class, 'teacher_id')->where('is_backup', 0);
     }
     
     public function preferences()

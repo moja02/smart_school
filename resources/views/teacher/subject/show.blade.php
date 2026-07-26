@@ -3,7 +3,7 @@
 @section('content')
 
 {{-- 1. ترويسة الصفحة --}}
-<div class="card page-header-card mb-4 shadow border-0" style="background: linear-gradient(to right, #4e73df, #224abe); color: white;">
+    <div class="card page-header-card mb-4 shadow border-0 bg-dark text-white">
     <div class="card-body p-4">
         <div class="d-flex justify-content-between align-items-center">
             <div>

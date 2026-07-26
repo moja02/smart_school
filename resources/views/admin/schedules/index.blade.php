@@ -47,6 +47,32 @@
         </div>
     </div>
 
+    {{-- 🛡️ شريط استرجاع الجدول القديم (Backup Revert) --}}
+    @if(isset($hasBackup) && $hasBackup)
+        <div class="alert border-0 shadow-sm mb-4" style="background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%); border-radius: 1rem; border-right: 5px solid #ffc107 !important;">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 p-2">
+                <div>
+                    <h5 class="fw-bold text-dark mb-1"><i class="fas fa-history text-warning me-2"></i> الجدول الجديد قيد التجربة</h5>
+                    <p class="mb-0 text-muted small">هذا هو الجدول الجديد الذي تم توليده. لا زال النظام يحتفظ بالجدول القديم مؤقتاً.</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <form action="{{ route('admin.schedules.revert') }}" method="POST" id="revertForm">
+                        @csrf
+                        <button type="button" class="btn btn-outline-danger fw-bold rounded-pill shadow-sm" onclick="confirmAction(event, 'هل أنت متأكد من حذف الجدول الجديد والعودة للجدول القديم؟')">
+                            <i class="fas fa-times me-1"></i> رفض واستعادة القديم
+                        </button>
+                    </form>
+                    <form action="{{ route('admin.schedules.confirm') }}" method="POST">
+                        @csrf
+                        <button type="button" class="btn btn-success fw-bold rounded-pill shadow-sm" onclick="confirmAction(event, 'هل أنت متأكد من مسح الجدول القديم واعتماد هذا الجدول نهائياً؟')">
+                            <i class="fas fa-check-double me-1"></i> اعتماد الجدول
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @if(session('success'))
         <div class="alert alert-success border-0 shadow-sm mb-4"><i class="fas fa-check-circle me-2"></i>{{ session('success') }}</div>
     @endif
@@ -473,6 +499,25 @@
             });
             resetSwapSelection();
         }
+    }
+
+    function confirmAction(event, message) {
+        event.preventDefault();
+        const form = event.currentTarget.closest('form');
+        Swal.fire({
+            title: 'هل أنت متأكد؟',
+            text: message,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#28a745',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'نعم، متأكد',
+            cancelButtonText: 'إلغاء'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                form.submit();
+            }
+        });
     }
 </script>
 @endsection

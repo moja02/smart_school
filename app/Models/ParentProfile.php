@@ -13,8 +13,5 @@ class ParentProfile extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function students()
-    {
-        return $this->hasMany(StudentProfile::class, 'parent_id');
-    }
+    // العلاقة مع الطلاب تتم عبر موديل User والجدول الوسيط parent_student
 }

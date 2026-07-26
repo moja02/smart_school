@@ -1,0 +1,21 @@
+config:
+  target: "http://localhost:8000"
+  phases:
+    - duration: 60
+      arrivalRate: 10
+      name: "Teachers submitting attendance simultaneously"
+scenarios:
+  - name: "Submit Class Attendance"
+    flow:
+      - post:
+          url: "/api/attendance/store"
+          json:
+            class_id: 1
+            students: 
+              - id: 1
+                status: "present"
+              - id: 2
+                status: "absent"
+          capture:
+            - json: "$.status"
+              as: "status"

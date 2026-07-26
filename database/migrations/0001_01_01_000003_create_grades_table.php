@@ -10,8 +10,10 @@ return new class extends Migration
     {
         Schema::create('grades', function (Blueprint $table) {
             $table->id();
-            $table->string('name'); // ✅ هذا هو العمود الناقص الذي سبب المشكلة
-            $table->unsignedBigInteger('school_id')->nullable(); // لربط المرحلة بالمدرسة
+            $table->string('name');
+            $table->enum('stage', ['primary', 'middle', 'secondary'])->default('primary');
+            $table->unsignedInteger('order')->default(0);
+            $table->unsignedBigInteger('school_id')->nullable();
             $table->timestamps();
         });
     }

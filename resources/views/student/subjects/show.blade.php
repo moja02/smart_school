@@ -110,6 +110,70 @@
     </div>
 </div>
 
+{{-- 2.5 الملفات الدراسية المتاحة --}}
+@if(isset($materials) && $materials->count() > 0)
+<div class="card shadow-sm border-0 mb-4" style="border-radius: 1rem;">
+    <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+        <h5 class="m-0 fw-bold text-dark"><i class="fas fa-folder-open text-warning me-2"></i> المذكرات والملفات الدراسية</h5>
+        <span class="badge bg-primary rounded-pill px-3 py-2">{{ $materials->count() }} ملفات</span>
+    </div>
+    <div class="card-body p-4">
+        <div class="row g-3">
+            @foreach($materials as $material)
+            <div class="col-md-6 col-lg-4">
+                <div class="card border h-100 shadow-sm hover-scale" style="border-radius: 0.75rem; transition: transform 0.2s;">
+                    <div class="card-body d-flex flex-column">
+                        <div class="d-flex align-items-start mb-3">
+                            <div class="me-3 fs-2">
+                                @php
+                                    $icons = [
+                                        'pdf' => 'fas fa-file-pdf text-danger',
+                                        'doc' => 'fas fa-file-word text-primary',
+                                        'docx' => 'fas fa-file-word text-primary',
+                                        'xls' => 'fas fa-file-excel text-success',
+                                        'xlsx' => 'fas fa-file-excel text-success',
+                                        'ppt' => 'fas fa-file-powerpoint text-warning',
+                                        'pptx' => 'fas fa-file-powerpoint text-warning',
+                                        'jpg' => 'fas fa-file-image text-info',
+                                        'jpeg' => 'fas fa-file-image text-info',
+                                        'png' => 'fas fa-file-image text-info',
+                                        'zip' => 'fas fa-file-archive text-secondary',
+                                        'rar' => 'fas fa-file-archive text-secondary',
+                                        'mp4' => 'fas fa-file-video text-danger',
+                                        'mp3' => 'fas fa-file-audio text-purple',
+                                    ];
+                                    $icon = $icons[$material->file_type] ?? 'fas fa-file text-secondary';
+                                @endphp
+                                <i class="{{ $icon }}"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="fw-bold text-dark mb-1">{{ $material->title }}</h6>
+                                @if($material->description)
+                                    <p class="text-muted small mb-1">{{ Str::limit($material->description, 60) }}</p>
+                                @endif
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <span class="badge bg-light text-dark border small">{{ strtoupper($material->file_type) }}</span>
+                                    <span class="badge bg-light text-muted border small">{{ $material->readable_file_size }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-auto pt-2 border-top">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted"><i class="fas fa-calendar me-1"></i>{{ $material->created_at->format('Y-m-d') }}</small>
+                                <a href="{{ route('student.materials.download', $material->id) }}" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm">
+                                    <i class="fas fa-download me-1"></i> تحميل
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endforeach
+        </div>
+    </div>
+</div>
+@endif
+
 {{-- 3. قائمة الدروس والاختبارات --}}
 <div class="card shadow-sm border-0" style="border-radius: 1rem;">
     <div class="card-header bg-white py-3 border-bottom d-flex align-items-center">

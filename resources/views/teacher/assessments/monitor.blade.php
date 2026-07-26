@@ -29,7 +29,7 @@
             <div class="alert alert-success">{{ session('success') }}</div>
         @endif
 
-        <form action="{{ route('teacher.assessments.store_grades', ['subject_id' => $subject->id, 'class_id' => $class->id, 'assessment_id' => $assessment->id]) }}" method="POST">
+        <form action="{{ route('teacher.assessments.save_marks', ['subject_id' => $subject->id, 'class_id' => $class->id, 'assessment_id' => $assessment->id]) }}" method="POST" id="monitorForm">
             @csrf
             
             <div class="table-responsive">

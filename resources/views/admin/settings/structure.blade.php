@@ -6,7 +6,12 @@
         <h5 class="mb-0 fw-bold"><i class="fas fa-cogs me-2"></i> هيكلية المدرسة (تحديد المراحل)</h5>
     </div>
     <div class="card-body p-4">
-        <p class="text-muted">حدد المراحل الدراسية المتوفرة في مدرستك فقط. سيتم إخفاء باقي المراحل من الجداول والتقارير.</p>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <p class="text-muted mb-0">حدد المراحل الدراسية المتوفرة في مدرستك فقط. سيتم إخفاء باقي المراحل من الجداول والتقارير.</p>
+            <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#addGradeModal">
+                <i class="fas fa-plus me-1"></i> إضافة سنة دراسية مخصصة
+            </button>
+        </div>
         
         <form action="{{ route('admin.settings.structure.update') }}" method="POST">
             @csrf
@@ -53,5 +58,38 @@
             </button>
         </form>
     </div>
+</div>
+
+<!-- Add Grade Modal -->
+<div class="modal fade" id="addGradeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">إضافة سنة دراسية مخصصة لمدرستك</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="{{ route('admin.grades.store') }}" method="POST">
+          @csrf
+          <div class="modal-body">
+              <div class="mb-3">
+                  <label class="form-label">اسم السنة الدراسية (مثال: رياض الأطفال 1)</label>
+                  <input type="text" name="name" class="form-control" required>
+              </div>
+              <div class="mb-3">
+                  <label class="form-label">تنتمي لأي مرحلة؟</label>
+                  <select name="stage" class="form-select" required>
+                      <option value="primary">المرحلة الابتدائية (أو ما يعادلها)</option>
+                      <option value="middle">المرحلة الإعدادية/المتوسطة</option>
+                      <option value="secondary">المرحلة الثانوية</option>
+                  </select>
+              </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+            <button type="submit" class="btn btn-success">إضافة السنة</button>
+          </div>
+      </form>
+    </div>
+  </div>
 </div>
 @endsection

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <title>Test Chart</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="card-body" style="position: relative; height: 350px; width: 100%; padding: 20px;">
+        <canvas id="radarChart-1"></canvas>
+    </div>
+    
+    <div id="chartData-1" 
+         data-labels="[&quot;\u0627\u0644\u0644\u063a\u0629 \u0627\u0644\u0639\u0631\u0628\u064a\u0629&quot;,&quot;\u0627\u0644\u0631\u064a\u0627\u0636\u064a\u0627\u062a&quot;,&quot;\u0627\u0644\u0639\u0644\u0648\u0645&quot;]" 
+         data-data="[85,61,59]">
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const childId = 1;
+            const dataDiv = document.getElementById('chartData-' + childId);
+            const radarCanvas = document.getElementById('radarChart-' + childId);
+            if (radarCanvas && dataDiv) {
+                const labelsText = dataDiv.getAttribute('data-labels');
+                const dataText = dataDiv.getAttribute('data-data');
+                let labels = [];
+                let data = [];
+                try { labels = JSON.parse(labelsText || '[]'); } catch(e){}
+                try { data = JSON.parse(dataText || '[]'); } catch(e){}
+                
+                if (labels.length > 0) {
+                    let ctx = radarCanvas.getContext('2d');
+                    let gradient = ctx.createLinearGradient(0, 0, 0, 400);
+                    gradient.addColorStop(0, 'rgba(54, 162, 235, 0.8)');
+                    gradient.addColorStop(1, 'rgba(54, 162, 235, 0.3)');
+
+                    new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'مستوى الأداء %',
+                                data: data,
+                                backgroundColor: gradient,
+                                borderColor: '#36a2eb',
+                                borderWidth: 2,
+                                borderRadius: 6,
+                                barPercentage: 0.6
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    max: 100,
+                                    grid: { color: 'rgba(0, 0, 0, 0.05)', drawBorder: false },
+                                    ticks: { stepSize: 20, font: { family: 'Tahoma', size: 12 }, callback: value => value + '%' }
+                                },
+                                x: {
+                                    grid: { display: false, drawBorder: false },
+                                    ticks: { font: { family: 'Tahoma', size: 12, weight: 'bold' } }
+                                }
+                            },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: 'rgba(0,0,0,0.8)',
+                                    titleFont: { family: 'Tahoma', size: 14 },
+                                    bodyFont: { family: 'Tahoma', size: 13, weight: 'bold' },
+                                    callbacks: { label: context => 'المستوى: ' + context.parsed.y + '%' }
+                                }
+                            },
+                            animation: { duration: 1500, easing: 'easeOutQuart' }
+                        }
+                    });
+                }
+            }
+        });
+    </script>
+</body>
+</html>
