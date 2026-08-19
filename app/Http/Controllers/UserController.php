@@ -6,7 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
-class userController extends Controller
+class UserController extends Controller
 {
     /**
      * Display a listing of the resource.
@@ -29,22 +29,21 @@ class userController extends Controller
      */
     public function store(Request $request)
     {
-    // التحقق من صحة البيانات
-    $request->validate([
-        'email' => 'required|email|unique:users,email',
-        'password' => 'required|min:8|confirmed', // تأكد من أن كلمة المرور تتطابق مع "تأكيد كلمة المرور"
-        'name' => 'required|string|max:255',
-    ]);
+        // التحقق من صحة البيانات
+        $request->validate([
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|min:8|confirmed', // تأكد من أن كلمة المرور تتطابق مع "تأكيد كلمة المرور"
+            'name' => 'required|string|max:255',
+        ]);
 
-   User::create($request->all());
+        User::create($request->all());
 
-    // تخزين رسالة في الجلسة
-    session()->flash('success', 'تم إنشاء الحساب بنجاح!');
+        // تخزين رسالة في الجلسة
+        session()->flash('success', 'تم إنشاء الحساب بنجاح!');
 
-    // إرجاع استجابة بعد العملية، يمكن أن تكون إعادة توجيه أو عرض رسالة
-    return redirect()->route('users.index'); // إعادة التوجيه إلى قائمة المستخدمين مثلاً
-}
-
+        // إرجاع استجابة بعد العملية، يمكن أن تكون إعادة توجيه أو عرض رسالة
+        return redirect()->route('users.index'); // إعادة التوجيه إلى قائمة المستخدمين مثلاً
+    }
 
     /**
      * Display the specified resource.

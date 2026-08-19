@@ -20,11 +20,11 @@ class AttendanceLogicTest extends TestCase
         $attendance = new Attendance([
             'student_id' => $profile->id,
             'status' => 'present',
-            'date' => now()->addDays(2)->format('Y-m-d')
+            'attendance_date' => now()->addDays(2)->format('Y-m-d')
         ]);
         
         // Simulating logic check before save
-        $isValidDate = $attendance->date <= now()->format('Y-m-d');
+        $isValidDate = $attendance->attendance_date <= now()->format('Y-m-d');
         
         $this->assertFalse($isValidDate);
     }

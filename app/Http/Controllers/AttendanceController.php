@@ -26,27 +26,49 @@ class AttendanceController extends Controller
     return view('teacher.attendance.index', compact('section', 'grade', 'students', 'todayAttendance'));
 }
 
-public function store(Request $request)
-{
-    $sectionId = $request->section_id;
-    $date = date('Y-m-d');
+    public function store(Request $request, $id = null)
+    {
+        $studentId = $id ?? $request->route('id') ?? $request->input('id') ?? $request->input('student_id');
+        $status = $request->input('status');
 
-    foreach ($request->attendance as $studentId => $status) {
-        DB::table('attendances')->updateOrInsert(
-            [
-                'student_id' => $studentId,
-                'section_id' => $sectionId,
-                'attendance_date' => $date
-            ],
-            [
-                'school_id' => auth()->user()->school_id,
-                'teacher_id' => auth()->user()->id,
-                'status' => $status,
-                'updated_at' => now()
-            ]
-        );
+        if ($studentId && $status) {
+            \App\Models\Attendance::updateOrCreate(
+                [
+                    'student_id' => $studentId,
+                    'attendance_date' => date('Y-m-d')
+                ],
+                [
+                    'user_id' => auth()->id() ?? 1,
+                    'status' => $status,
+                ]
+            );
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['status' => 'success']);
+            }
+            return back()->with('success', 'تم تسجيل الحضور بنجاح ✅');
+        }
+
+        if ($request->has('attendance') && is_iterable($request->attendance)) {
+            $sectionId = $request->section_id;
+            $date = date('Y-m-d');
+
+            foreach ($request->attendance as $sId => $st) {
+                \App\Models\Attendance::updateOrCreate(
+                    [
+                        'student_id' => $sId,
+                        'attendance_date' => $date
+                    ],
+                    [
+                        'user_id' => auth()->id() ?? 1,
+                        'class_id' => $sectionId,
+                        'status' => $st,
+                    ]
+                );
+            }
+
+            return back()->with('success', 'تم حفظ غياب اليوم بنجاح ✅');
+        }
+
+        return back();
     }
-
-    return back()->with('success', 'تم حفظ غياب اليوم بنجاح ✅');
-}
 }

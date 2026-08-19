@@ -51,14 +51,14 @@ class SchoolStructureController extends Controller
     public function storeGrade(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|unique:grades,name',
-            'stage' => 'required|string|in:primary,middle,secondary',
+            'name' => 'required|string',
+            'stage' => 'nullable|string|in:primary,middle,secondary',
             'notes' => 'nullable|string',
         ]);
         Grade::create([
             'name' => $request->name,
-            'stage' => $request->stage,
-            'school_id' => auth()->user()->school_id, 
+            'stage' => $request->stage ?? 'primary',
+            'school_id' => auth()->user()->school_id ?? null, 
         ]);
         return redirect()->back()->with('success', 'تم إضافة السنة الدراسية بنجاح');
     }

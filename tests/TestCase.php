@@ -10,6 +10,10 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
         
+        if (!\Illuminate\Support\Facades\Schema::hasTable('roles')) {
+            return;
+        }
+
         $roles = ['super_admin', 'manager', 'admin', 'teacher', 'student', 'parent'];
         foreach ($roles as $role) {
             \Spatie\Permission\Models\Role::firstOrCreate(['name' => $role]);

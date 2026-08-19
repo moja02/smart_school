@@ -13,6 +13,9 @@ return new class extends Migration
     {
         Schema::create('fees', function (Blueprint $table) {
             $table->id();
+            $table->string('title')->nullable();
+            $table->decimal('amount', 10, 2)->default(0);
+            $table->date('due_date')->nullable();
             $table->timestamps();
         });
     }

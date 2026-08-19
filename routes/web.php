@@ -19,7 +19,7 @@ use App\Http\Controllers\TeacherController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\ParentController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\userController;
+use App\Http\Controllers\UserController as PublicUserController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ManagerController;
 use App\Http\Controllers\AssessmentController;
@@ -46,7 +46,7 @@ Route::get('/register', [AuthController::class, 'showRegister'])->name('register
 Route::post('/register', [AuthController::class, 'register'])->name('register');
 
 // الصفحة العامة بعد الدخول
-Route::get('/home', [userController::class, 'index'])->name('home');
+Route::get('/home', [PublicUserController::class, 'index'])->name('home');
 
 // طلب التسجيل (Admissions)
 Route::get('/admissions/apply', [AdmissionController::class, 'create'])->name('admissions.create');
@@ -480,16 +480,7 @@ Route::post('/admin/fees', function() {
     return redirect()->back();
 })->name('admin.fees.store');
 
-Route::post('/teacher/attendance/{id}', function(\Illuminate\Http\Request $request, $id) {
-    \App\Models\Attendance::create([
-        'user_id' => 1,
-        'class_id' => 1,
-        'attendance_date' => now(),
-        'student_id' => $id, 
-        'status' => request('status')
-    ]);
-    return response()->json(['status' => 'success']);
-})->name('teacher.attendance.store');
+Route::post('/teacher/attendance/{id?}', [AttendanceController::class, 'store'])->name('teacher.attendance.store');
 
 Route::post('/parent/leaves', function() {
     \App\Models\LeaveRequest::create([

@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('parent_id');
             $table->unsignedBigInteger('student_id');
-            $table->enum('type', ['absence', 'early_leave']);
+            $table->string('type')->default('absence');
             $table->date('leave_date');
             $table->text('reason')->nullable();
             $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
