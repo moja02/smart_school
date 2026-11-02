@@ -1,0 +1,40 @@
+erDiagram
+    USERS ||--o| STUDENT_PROFILES : "1:1 profile"
+    USERS ||--o| PARENT_PROFILES : "1:1 profile"
+    SCHOOLS ||--o{ USERS : "belongs to"
+    SCHOOLS ||--o{ SCHOOL_CLASSES : "has"
+    GRADES ||--o{ SCHOOL_CLASSES : "defines"
+    GRADES ||--o{ SUBJECTS : "curriculum"
+    
+    PARENT_PROFILES }|--|{ STUDENT_PROFILES : "parent_student (M:N)"
+    SCHOOL_CLASSES ||--o{ STUDENT_PROFILES : "enrolls"
+    
+    SUBJECTS }|--|{ USERS : "teacher_subject (M:N)"
+    STUDENT_PROFILES }|--|{ SUBJECTS : "student_subject (M:N)"
+    
+    SCHOOL_CLASSES ||--o{ TIMETABLES : "class_schedule"
+    SUBJECTS ||--o{ TIMETABLES : "subject_schedule"
+    USERS ||--o{ TIMETABLES : "teacher_schedule"
+    
+    SUBJECTS ||--o{ EXAMS : "has_exams"
+    SCHOOL_CLASSES ||--o{ EXAMS : "exam_class"
+    EXAMS ||--o{ MARKS : "has_marks"
+    STUDENT_PROFILES ||--o{ MARKS : "receives_marks"
+    
+    STUDENT_PROFILES ||--o{ ATTENDANCES : "has_attendance"
+    SUBJECTS ||--o{ ATTENDANCES : "subject_attendance"
+    
+    SUBJECTS ||--o{ ONLINE_EXAMS : "has_online_exams"
+    ONLINE_EXAMS ||--o{ ONLINE_EXAM_QUESTIONS : "contains_questions"
+    ONLINE_EXAMS ||--o{ ONLINE_EXAM_ATTEMPTS : "has_attempts"
+    STUDENT_PROFILES ||--o{ ONLINE_EXAM_ATTEMPTS : "makes_attempts"
+    
+    SUBJECTS ||--o{ STUDY_MATERIALS : "has_materials"
+    
+    STUDENT_PROFILES ||--o{ FEES : "billed_fees"
+    FEES ||--o{ FEE_PAYMENTS : "has_payments"
+    STUDENT_PROFILES ||--o{ WALLET_TRANSACTIONS : "wallet_history"
+    
+    STUDENT_PROFILES ||--o{ LEAVE_REQUESTS : "submits_leave"
+    USERS ||--o{ MESSAGES : "sends_messages"
+    USERS ||--o{ MESSAGES : "receives_messages"
